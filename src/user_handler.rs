@@ -1,25 +1,54 @@
 use std::sync::Arc;
 
-use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::{
+    password_hash::SaltString,
+    Argon2,
+    PasswordHash,
+    PasswordHasher,
+    PasswordVerifier,
+};
 use axum::{
     extract::State,
-    http::{header, Response, StatusCode},
+    http::{
+        header,
+        Response,
+        StatusCode,
+    },
     response::IntoResponse,
-    Extension, Json,
+    Extension,
+    Json,
 };
-use axum_extra::extract::cookie::{Cookie, SameSite};
-use jsonwebtoken::{encode, EncodingKey, Header};
+use axum_extra::extract::cookie::{
+    Cookie,
+    SameSite,
+};
+use email_address_parser::{
+    EmailAddress,
+    ParsingOptions,
+};
+use jsonwebtoken::{
+    encode,
+    EncodingKey,
+    Header,
+};
+use passwords::analyzer;
 use rand_core::OsRng;
 use serde_json::json;
 
 use crate::{
-    model::{LoginUserSchema, RegisterUserSchema, TokenClaims, User},
+    model::{
+        LoginUserSchema,
+        RegisterUserSchema,
+        Role,
+        TokenClaims,
+        User,
+    },
     response::FilteredUser,
     AppState,
 };
 
 pub async fn health_checker_handler() -> impl IntoResponse {
-    const MESSAGE: &str = "JWT Authentication in Rust using Axum, Postgres, and SQLX";
+    const MESSAGE: &str = "Healthy!";
 
     let json_response = serde_json::json!({
         "status": "success",
@@ -33,9 +62,11 @@ pub async fn register_user_handler(
     State(data): State<Arc<AppState>>,
     Json(body): Json<RegisterUserSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let escaped_email: String = body.email.to_owned().to_ascii_lowercase();
+    validate_login_params(&escaped_email, &body.password)?;
     let user_exists: Option<bool> =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)")
-            .bind(body.email.to_owned().to_ascii_lowercase())
+            .bind(escaped_email.to_owned())
             .fetch_one(&data.db)
             .await
             .map_err(|e| {
@@ -70,9 +101,10 @@ pub async fn register_user_handler(
 
     let user = sqlx::query_as!(
         User,
-        "INSERT INTO users (email,password) VALUES ($1, $2) RETURNING *",
-        body.email.to_string().to_ascii_lowercase(),
-        hashed_password
+        "INSERT INTO users (email,password,role) VALUES ($1, $2, $3) RETURNING *",
+        escaped_email,
+        hashed_password,
+        Role::User.to_string()
     )
     .fetch_one(&data.db)
     .await
@@ -95,6 +127,8 @@ pub async fn login_user_handler(
     State(data): State<Arc<AppState>>,
     Json(body): Json<LoginUserSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let escaped_email: String = body.email.to_owned().to_ascii_lowercase();
+    validate_login_params(&escaped_email, &body.password)?;
     let user = sqlx::query_as!(
         User,
         "SELECT * FROM users WHERE email = $1",
@@ -118,9 +152,11 @@ pub async fn login_user_handler(
     })?;
 
     let is_valid = match PasswordHash::new(&user.password) {
-        Ok(parsed_hash) => Argon2::default()
-            .verify_password(body.password.as_bytes(), &parsed_hash)
-            .map_or(false, |_| true),
+        Ok(parsed_hash) => {
+            Argon2::default()
+                .verify_password(body.password.as_bytes(), &parsed_hash)
+                .map_or(false, |_| true)
+        }
         Err(_) => false,
     };
 
@@ -197,4 +233,34 @@ fn filter_user_record(user: &User) -> FilteredUser {
         createdAt: user.created_at.unwrap(),
         updatedAt: user.updated_at.unwrap(),
     }
+}
+
+fn validate_login_params(
+    email: &str,
+    password: &str,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    let email: Option<EmailAddress> = EmailAddress::parse(email, Some(ParsingOptions::default()));
+
+    if email.is_none() {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Email is invalid",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    let analyzed = analyzer::analyze(password);
+    if analyzed.length() < 8
+        || analyzed.symbols_count() < 1
+        || analyzed.numbers_count() < 1
+        || analyzed.uppercase_letters_count() < 1
+    {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Password is too weak. Must contain 1 non-alphanumeric character, 1 upper letter, 1 number and be at least 8 characters long",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    Ok(())
 }

@@ -3,18 +3,29 @@ use std::sync::Arc;
 use axum::{
     body::Body,
     extract::State,
-    http::{header, Request, StatusCode},
+    http::{
+        header,
+        Request,
+        StatusCode,
+    },
     middleware::Next,
     response::IntoResponse,
     Json,
 };
 
 use axum_extra::extract::cookie::CookieJar;
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use jsonwebtoken::{
+    decode,
+    DecodingKey,
+    Validation,
+};
 use serde::Serialize;
 
 use crate::{
-    model::{TokenClaims, User},
+    model::{
+        TokenClaims,
+        User,
+    },
     AppState,
 };
 

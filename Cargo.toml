@@ -9,13 +9,18 @@ edition = "2021"
 argon2 = "0.5.2"
 axum = "0.7.2"
 axum-extra = { version = "0.9.0", features = ["cookie"] }
+axum_typed_multipart = "0.11.0"
 chrono = { version = "0.4.31", features = ["serde"] }
 dotenv = "0.15.0"
+email-address-parser = "2.0.0"
 jsonwebtoken = "9.2.0"
+passwords = "3.1.16"
 rand_core = { version = "0.6.4", features = ["std"] }
+regex = "1.10.2"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
 sqlx = { version = "0.7.3", features = ["runtime-async-std-native-tls", "postgres", "chrono", "uuid"] }
+tempfile = "3.9.0"
 time = "0.3.30"
 tokio = { version = "1.35.0", features = ["full"] }
 tower-http = { version = "0.5.0", features = ["cors"] }
