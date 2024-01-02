@@ -1,15 +1,9 @@
-use axum_typed_multipart::{
-    FieldData,
-    TryFromMultipart,
-    TypedMultipart,
-};
 use chrono::prelude::*;
 use serde::{
     Deserialize,
     Serialize,
 };
 use std::fmt;
-use tempfile::NamedTempFile;
 
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, sqlx::FromRow, Serialize, Clone)]
@@ -60,7 +54,7 @@ impl fmt::Display for Role {
 }
 
 #[allow(non_snake_case)]
-#[derive(Debug, Deserialize, sqlx::FromRow, Serialize, Clone)]
+#[derive(Debug, Deserialize, sqlx::FromRow, Serialize, Clone, Default)]
 pub struct Project {
     pub id: uuid::Uuid,
     pub name: String,
@@ -99,19 +93,6 @@ pub struct UpdateProjectSchema {
     pub name: String,
     pub description: String,
     pub github_url: String,
-}
-
-#[derive(TryFromMultipart)]
-pub struct UploadRevisionSchema {
-    // The `unlimited arguments` means that this field will be limited to the
-    // total size of the request body. If you want to limit the size of this
-    // field to a specific value you can also specify a limit in bytes, like
-    // '5MiB' or '1GiB'.
-    #[form_data(limit = "unlimited")]
-    pub zip: FieldData<NamedTempFile>,
-
-    pub version: String,
-    pub project_id: uuid::Uuid,
 }
 
 #[derive(Debug, Deserialize)]

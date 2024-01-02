@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
+    extract::DefaultBodyLimit,
     middleware,
     routing::{
         delete,
@@ -17,6 +18,7 @@ use crate::{
         add_project_handler,
         delete_project_handler,
         update_project_handler,
+        upload_revision,
     },
     user_handler::{
         get_me_handler,
@@ -57,6 +59,12 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
             "/api/v1/project",
             delete(delete_project_handler)
                 .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
+        )
+        .route(
+            "/api/v1/revision/upload",
+            post(upload_revision)
+                .route_layer(middleware::from_fn_with_state(app_state.clone(), auth))
+                .layer(DefaultBodyLimit::max(52428800)),
         )
         .with_state(app_state)
 }

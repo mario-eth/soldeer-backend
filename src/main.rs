@@ -6,6 +6,8 @@ mod response;
 mod route;
 mod user_handler;
 
+use aws_config::BehaviorVersion;
+use aws_sdk_s3 as s3;
 use axum::http::{
     header::{
         ACCEPT,
@@ -18,6 +20,7 @@ use axum::http::{
 use config::Config;
 use dotenv::dotenv;
 use route::create_router;
+use s3::Client;
 use sqlx::{
     postgres::PgPoolOptions,
     Pool,
@@ -29,6 +32,7 @@ use tower_http::cors::CorsLayer;
 pub struct AppState {
     db: Pool<Postgres>,
     env: Config,
+    aws_client: aws_sdk_s3::Client,
 }
 
 #[tokio::main]
@@ -63,9 +67,19 @@ async fn main() {
         .allow_credentials(true)
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE]);
 
+    // install global collector configured based on RUST_LOG env var.
+    tracing_subscriber::fmt::init();
+
+    // the aws credentials from environment
+    let aws_configuration = aws_config::load_defaults(BehaviorVersion::v2023_11_09()).await;
+
+    //create aws s3 client
+    let aws_s3_client = Client::new(&aws_configuration);
+
     let app: axum::Router = create_router(Arc::new(AppState {
         db: pool.clone(),
         env: config.clone(),
+        aws_client: aws_s3_client.clone(),
     }))
     .layer(cors);
 
