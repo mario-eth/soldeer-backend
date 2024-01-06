@@ -29,6 +29,8 @@ use sqlx::{
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
+use tokio::net::TcpListener;
+
 pub struct AppState {
     db: Pool<Postgres>,
     env: Config,
@@ -38,9 +40,9 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    let config = Config::init();
+    let config: Config = Config::init();
 
-    let pool = match PgPoolOptions::new()
+    let pool: Pool<Postgres> = match PgPoolOptions::new()
         .max_connections(10)
         .connect(&config.database_url)
         .await
@@ -55,8 +57,8 @@ async fn main() {
         }
     };
 
-    let cors = CorsLayer::new()
-        .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
+    let cors: CorsLayer = CorsLayer::new()
+        .allow_origin(config.url.parse::<HeaderValue>().unwrap())
         .allow_methods([
             Method::GET,
             Method::POST,
@@ -71,10 +73,11 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // the aws credentials from environment
-    let aws_configuration = aws_config::load_defaults(BehaviorVersion::v2023_11_09()).await;
+    let aws_configuration: aws_config::SdkConfig =
+        aws_config::load_defaults(BehaviorVersion::v2023_11_09()).await;
 
     //create aws s3 client
-    let aws_s3_client = Client::new(&aws_configuration);
+    let aws_s3_client: Client = Client::new(&aws_configuration);
 
     let app: axum::Router = create_router(Arc::new(AppState {
         db: pool.clone(),
@@ -85,6 +88,6 @@ async fn main() {
 
     println!("🚀 Server started successfully");
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener: TcpListener = TcpListener::bind(config.url).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }

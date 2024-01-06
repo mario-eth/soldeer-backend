@@ -17,6 +17,8 @@ use crate::{
     project_handler::{
         add_project_handler,
         delete_project_handler,
+        get_project_revisions,
+        get_projects,
         update_project_handler,
         upload_revision,
     },
@@ -45,6 +47,8 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
             get(get_me_handler)
                 .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
         )
+        .route("/api/v1/project", get(get_projects))
+        .route("/api/v1/revision", get(get_project_revisions))
         .route(
             "/api/v1/project",
             post(add_project_handler)

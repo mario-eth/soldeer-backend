@@ -98,7 +98,7 @@ pub async fn auth(
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json_error))
         })?;
 
-    let user = user.ok_or_else(|| {
+    let user: User = user.ok_or_else(|| {
         let json_error = ErrorResponse {
             status: "fail",
             message: "The user belonging to this token no longer exists".to_string(),

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{
     extract::{
         Multipart,
+        Query,
         State,
     },
     http::StatusCode,
@@ -12,18 +13,23 @@ use axum::{
 };
 use regex::Regex;
 use serde_json::json;
+use sqlx::{
+    postgres::PgArguments,
+    query::QueryAs,
+    Postgres,
+};
 
 use crate::{
     model::{
         CreateProjectSchema,
+        FetchProjectsSchema,
         Project,
+        Revision,
         UpdateProjectSchema,
         User,
     },
     AppState,
 };
-
-use std::collections::HashMap;
 
 use uuid::Uuid;
 
@@ -168,34 +174,24 @@ pub async fn delete_project_handler(
     Ok(Json(project_response))
 }
 
-// pub async fn add_revision(Extension(user): Extension<User>,
-// State(data): State<Arc<AppState>>,
-// body: UploadRevisionSchema){
-
-// }
-
 pub async fn upload_revision(
     Extension(user): Extension<User>,
     State(data): State<Arc<AppState>>,
     mut files: Multipart,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    // TODO check if revision was already uploaded
-    // TODO add revision in the db
-    // Check if file is zip only and add a restriction on the max file size
-
     // get the name of aws bucket from env variable
     let bucket = &data.env.aws_s3_bucket;
     // if you have a public url for your bucket, place it as ENV variable BUCKET_URL
     //get the public url for aws bucket
     let aws_client = &data.aws_client;
     // we are going to store the response in HashMap as filename: url => key: value
-    let mut res = HashMap::new();
     let mut project: Project = Project::default();
     let mut revision: String = String::new();
+    let mut remote_name: String = String::new();
     while let Some(file) = files.next_field().await.unwrap() {
         let field_name = file.name().unwrap().to_string();
         if field_name == "project_id" {
-            let project_id =
+            let project_id: Uuid =
                 Uuid::parse_str(std::str::from_utf8(file.bytes().await.unwrap().as_ref()).unwrap())
                     .unwrap();
             project = sqlx::query_as!(
@@ -218,6 +214,36 @@ pub async fn upload_revision(
             revision = std::str::from_utf8(file.bytes().await.unwrap().as_ref())
                 .unwrap()
                 .to_string();
+            if project.id == Uuid::nil() {
+                let error_response = serde_json::json!({
+                    "status": "fail",
+                    "message": "Project field was not sent correctly. The order must be project_id, revision, file",
+                });
+                return Err((StatusCode::NOT_FOUND, Json(error_response)));
+            }
+            let revision_exists: Option<bool> = sqlx
+                ::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM revisions WHERE version = $1 AND project_id = $2 AND deleted = FALSE)"
+                )
+                .bind(revision.to_owned())
+                .bind(project.id)
+                .fetch_one(&data.db).await
+                .map_err(|e| {
+                    let error_response =
+                        serde_json::json!({
+                    "status": "fail",
+                    "message": format!("Database error: {}", e),
+                });
+                    (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+                })?;
+
+            if revision_exists.unwrap() {
+                let error_response = serde_json::json!({
+                    "status": "fail",
+                    "message": "This revision already exists",
+                });
+                return Err((StatusCode::NOT_FOUND, Json(error_response)));
+            }
             continue;
         }
         // this is the name which is sent in formdata from frontend or whoever called the api, i am
@@ -226,10 +252,19 @@ pub async fn upload_revision(
 
         // name of the file with extension
         let name = file.file_name().unwrap().to_string();
+
+        // checks if it's a zip file
+        if file.content_type().unwrap() != "application/zip" {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": "The revision is not a zip",
+            });
+            return Err((StatusCode::NOT_FOUND, Json(error_response)));
+        }
         // file data
         let data = file.bytes().await.unwrap();
         // the path of file to store on aws s3 with file name and extension
-        let key = format!(
+        remote_name = format!(
             "{}/{}_{}_{}",
             project.name.replace("-", "_"),
             revision.replace(".", "_"),
@@ -241,7 +276,7 @@ pub async fn upload_revision(
         let _resp = aws_client
             .put_object()
             .bucket(bucket)
-            .key(&key)
+            .key(&remote_name)
             .body(data.into())
             .send()
             .await
@@ -252,14 +287,122 @@ pub async fn upload_revision(
                     Json(serde_json::json!({"err": "an error ocurred during image upload"})),
                 )
             })?;
-        res.insert(
-            // concatenating name and category so even if the filenames are same it will not
-            // conflict
-            "result", "success",
-        );
     }
-    // send the urls in response
-    Ok(Json(serde_json::json!(res)))
+    let inserted_revision = sqlx
+        ::query_as!(
+            Revision,
+            "INSERT INTO revisions (version, internal_name, url, project_id) VALUES ($1, $2, $3, $4) RETURNING *",
+            &revision,
+            &remote_name,
+            data.env.aws_bucket_url.to_owned()+remote_name.as_str(),
+            project.id
+        )
+        .fetch_one(&data.db).await
+        .map_err(|e| {
+            let error_response =
+                serde_json::json!({
+            "status": "fail",
+            "message": format!("Database error: {}", e),
+        });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?;
+
+    let revision_response = serde_json::json!({"status": "success","data": serde_json::json!({
+        "data": inserted_revision
+    })});
+    Ok(Json(revision_response))
+}
+
+pub async fn get_projects(
+    State(data): State<Arc<AppState>>,
+    Query(params): Query<FetchProjectsSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let query: QueryAs<'_, Postgres, Project, PgArguments>;
+    if params.project_id.is_some() {
+        query = sqlx::query_as("SELECT * FROM projects WHERE id = $1 AND deleted = FALSE")
+            .bind(params.project_id.unwrap());
+    } else {
+        if params.user_id.is_none() {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": "User id is required",
+            });
+            return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+        }
+        query = sqlx::query_as("SELECT * FROM projects WHERE user_id = $1 AND deleted = FALSE")
+            .bind(params.user_id.unwrap());
+    }
+    let projects: Vec<Project> = query
+        .fetch_all(&data.db)
+        .await
+        .map_err(|e| {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": format!("Database error: {}", e),
+            });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?
+        .iter()
+        .map(|project| {
+            Project {
+                id: project.id,
+                name: project.name.clone(),
+                description: project.description.clone(),
+                github_url: project.github_url.clone(),
+                user_id: project.user_id,
+                deleted: project.deleted,
+                created_at: project.created_at,
+                updated_at: project.updated_at,
+            }
+        })
+        .collect();
+
+    let project_response = serde_json::json!({"status": "success","data": projects
+    });
+    Ok(Json(project_response))
+}
+
+pub async fn get_project_revisions(
+    State(data): State<Arc<AppState>>,
+    Query(params): Query<FetchProjectsSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    if params.project_id.is_none() {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Project id is required",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+    let revisions: Vec<Revision> = sqlx::query_as!(
+        Revision,
+        "SELECT * FROM revisions WHERE project_id = $1 AND deleted = FALSE",
+        params.project_id.unwrap()
+    )
+    .fetch_all(&data.db)
+    .await
+    .map_err(|e| {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": format!("Database error: {}", e),
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?
+    .iter()
+    .map(|revision| {
+        Revision {
+            id: revision.id,
+            version: revision.version.clone(),
+            internal_name: revision.internal_name.clone(),
+            url: revision.url.clone(),
+            project_id: revision.project_id,
+            deleted: revision.deleted,
+            created_at: revision.created_at,
+        }
+    })
+    .collect();
+
+    let revision_response = serde_json::json!({"status": "success","data": revisions});
+    Ok(Json(revision_response))
 }
 
 fn validate_add_project_params(

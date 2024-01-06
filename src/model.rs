@@ -63,7 +63,6 @@ pub struct Project {
     pub user_id: uuid::Uuid,
     #[sqlx(default)]
     pub deleted: Option<bool>,
-    pub current_revision: Option<uuid::Uuid>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -105,4 +104,12 @@ pub struct CreateRevisionSchema {
     pub version: String,
     pub url: String,
     pub project_id: uuid::Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FetchProjectsSchema {
+    #[serde(default)]
+    pub user_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub project_id: Option<uuid::Uuid>,
 }
