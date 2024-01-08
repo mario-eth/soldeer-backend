@@ -86,7 +86,7 @@ async fn main() {
     }))
     .layer(cors);
 
-    println!("🚀 Server started successfully");
+    println!("🚀 Server started successfully on {}", config.url);
 
     let listener: TcpListener = TcpListener::bind(config.url).await.unwrap();
     axum::serve(listener, app).await.unwrap();
