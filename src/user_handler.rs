@@ -34,6 +34,7 @@ use jsonwebtoken::{
 use passwords::analyzer;
 use rand_core::OsRng;
 use serde_json::json;
+use std::str::FromStr;
 
 use crate::{
     model::{
@@ -148,7 +149,7 @@ pub async fn login_user_handler(
             "status": "fail",
             "message": "Invalid email or password",
         });
-        (StatusCode::BAD_REQUEST, Json(error_response))
+        (StatusCode::UNAUTHORIZED, Json(error_response))
     })?;
 
     let is_valid = match PasswordHash::new(&user.password) {
@@ -165,12 +166,12 @@ pub async fn login_user_handler(
             "status": "fail",
             "message": "Invalid email or password"
         });
-        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+        return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
     }
 
-    let now = chrono::Utc::now();
-    let iat = now.timestamp() as usize;
-    let exp = (now + chrono::Duration::minutes(60)).timestamp() as usize;
+    let now: chrono::prelude::DateTime<chrono::prelude::Utc> = chrono::Utc::now();
+    let iat: usize = now.timestamp() as usize;
+    let exp: usize = (now + chrono::Duration::minutes(i64::from_str(&data.env.jwt_expires_in).unwrap())).timestamp() as usize;
     let claims: TokenClaims = TokenClaims {
         sub: user.id.to_string(),
         exp,

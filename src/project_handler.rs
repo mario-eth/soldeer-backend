@@ -179,6 +179,7 @@ pub async fn upload_revision(
     State(data): State<Arc<AppState>>,
     mut files: Multipart,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    println!("Uploading revision...");
     // get the name of aws bucket from env variable
     let bucket = &data.env.aws_s3_bucket;
     // if you have a public url for your bucket, place it as ENV variable BUCKET_URL
