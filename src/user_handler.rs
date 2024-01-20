@@ -171,7 +171,9 @@ pub async fn login_user_handler(
 
     let now: chrono::prelude::DateTime<chrono::prelude::Utc> = chrono::Utc::now();
     let iat: usize = now.timestamp() as usize;
-    let exp: usize = (now + chrono::Duration::minutes(i64::from_str(&data.env.jwt_expires_in).unwrap())).timestamp() as usize;
+    let exp: usize = (now
+        + chrono::Duration::minutes(i64::from_str(&data.env.jwt_expires_in).unwrap()))
+    .timestamp() as usize;
     let claims: TokenClaims = TokenClaims {
         sub: user.id.to_string(),
         exp,

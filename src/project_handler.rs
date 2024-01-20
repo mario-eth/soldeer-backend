@@ -23,6 +23,7 @@ use crate::{
     model::{
         CreateProjectSchema,
         FetchProjectsSchema,
+        FetchRevisionsSchema,
         Project,
         Revision,
         UpdateProjectSchema,
@@ -322,6 +323,9 @@ pub async fn get_projects(
     if params.project_id.is_some() {
         query = sqlx::query_as("SELECT * FROM projects WHERE id = $1 AND deleted = FALSE")
             .bind(params.project_id.unwrap());
+    } else if params.project_name.is_some() {
+        query = sqlx::query_as("SELECT * FROM projects WHERE name = $1 AND deleted = FALSE")
+            .bind(params.project_name.unwrap());
     } else {
         if params.user_id.is_none() {
             let error_response = serde_json::json!({
@@ -365,43 +369,90 @@ pub async fn get_projects(
 
 pub async fn get_project_revisions(
     State(data): State<Arc<AppState>>,
-    Query(params): Query<FetchProjectsSchema>,
+    Query(params): Query<FetchRevisionsSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    if params.project_id.is_none() {
+    let query: QueryAs<'_, Postgres, Revision, PgArguments>;
+    println!("params: {:?}", params);
+    let project: Project;
+    if params.project_name.is_some() {
+        project = sqlx::query_as!(
+            Project,
+            "SELECT * FROM projects WHERE name = $1 AND deleted = FALSE",
+            params.project_name.as_ref().unwrap(),
+        )
+        .fetch_one(&data.db)
+        .await
+        .map_err(|e| {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": format!("Database error: {}", e),
+            });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?;
+    } else if params.project_id.is_some() {
+        project = sqlx::query_as!(
+            Project,
+            "SELECT * FROM projects WHERE id = $1 AND deleted = FALSE",
+            params.project_id.unwrap(),
+        )
+        .fetch_one(&data.db)
+        .await
+        .map_err(|e| {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": format!("Database error: {}", e),
+            });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?;
+    } else {
+        project = Project::default();
+    }
+
+    println!("project: {:?}", project);
+
+    if params.revision.is_some() {
+        query = sqlx::query_as(
+            "SELECT * FROM revisions WHERE project_id = $1 AND version = $2 AND deleted = FALSE",
+        )
+        .bind(project.id)
+        .bind(params.revision.unwrap());
+    } else if params.project_name.is_some() {
+        query = sqlx::query_as("SELECT * FROM revisions WHERE project_id = $1 AND deleted = FALSE")
+            .bind(project.id);
+    } else if params.revision_id.is_some() {
+        query = sqlx::query_as("SELECT * FROM revisions WHERE id = $1 AND deleted = FALSE")
+            .bind(params.project_id.unwrap());
+    } else {
         let error_response = serde_json::json!({
             "status": "fail",
-            "message": "Project id is required",
+            "message": "Project id or name is required",
         });
         return Err((StatusCode::BAD_REQUEST, Json(error_response)));
     }
-    let revisions: Vec<Revision> = sqlx::query_as!(
-        Revision,
-        "SELECT * FROM revisions WHERE project_id = $1 AND deleted = FALSE",
-        params.project_id.unwrap()
-    )
-    .fetch_all(&data.db)
-    .await
-    .map_err(|e| {
-        let error_response = serde_json::json!({
-            "status": "fail",
-            "message": format!("Database error: {}", e),
-        });
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
-    })?
-    .iter()
-    .map(|revision| {
-        Revision {
-            id: revision.id,
-            version: revision.version.clone(),
-            internal_name: revision.internal_name.clone(),
-            url: revision.url.clone(),
-            project_id: revision.project_id,
-            deleted: revision.deleted,
-            created_at: revision.created_at,
-        }
-    })
-    .collect();
-
+    let revisions: Vec<Revision> = query
+        .fetch_all(&data.db)
+        .await
+        .map_err(|e| {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": format!("Database error: {}", e),
+            });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?
+        .iter()
+        .map(|revision| {
+            Revision {
+                id: revision.id,
+                version: revision.version.clone(),
+                internal_name: revision.internal_name.clone(),
+                url: revision.url.clone(),
+                project_id: revision.project_id,
+                deleted: revision.deleted,
+                created_at: revision.created_at,
+            }
+        })
+        .collect();
+    println!("revisions: {:?}", revisions);
     let revision_response = serde_json::json!({"status": "success","data": revisions});
     Ok(Json(revision_response))
 }

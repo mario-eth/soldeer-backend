@@ -112,4 +112,14 @@ pub struct FetchProjectsSchema {
     pub user_id: Option<uuid::Uuid>,
     #[serde(default)]
     pub project_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub project_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FetchRevisionsSchema {
+    pub project_id: Option<uuid::Uuid>,
+    pub revision_id: Option<uuid::Uuid>,
+    pub project_name: Option<String>,
+    pub revision: Option<String>,
 }
