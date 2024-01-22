@@ -263,13 +263,15 @@ pub async fn upload_revision(
             });
             return Err((StatusCode::NOT_FOUND, Json(error_response)));
         }
+        let revision_name = revision.replace(".", "_");
+        println!("Revision ready to upload to aws s3 {} {}", &project.name, &revision_name);
         // file data
         let data = file.bytes().await.unwrap();
         // the path of file to store on aws s3 with file name and extension
         remote_name = format!(
             "{}/{}_{}_{}",
-            project.name.replace("-", "_"),
-            revision.replace(".", "_"),
+            &project.name,
+            &revision_name,
             chrono::Utc::now().format("%d-%m-%Y_%H:%M:%S"),
             &name.replace(" ", "_")
         );
@@ -462,7 +464,7 @@ fn validate_add_project_params(
     description: &str,
     github_url: &str,
 ) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
-    let pattern_name = Regex::new(r"^[a-z][a-z-]*[a-z]$").unwrap();
+    let pattern_name = Regex::new(r"^[@|a-z][a-z0-9-]*[a-z]$").unwrap();
     if !pattern_name.is_match(&name) {
         let error_response = serde_json::json!({
             "status": "fail",
