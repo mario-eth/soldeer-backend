@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE projects SET deleted = TRUE WHERE id = $1 AND user_id = $2 AND deleted = FALSE RETURNING *",
+  "query": "SELECT * FROM projects WHERE id = $1 AND deleted = FALSE",
   "describe": {
     "columns": [
       {
@@ -61,7 +61,6 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Uuid"
       ]
     },
@@ -79,5 +78,5 @@
       true
     ]
   },
-  "hash": "5734995c162ba0f8af155e52ae8126f3a6feaf712c05e69dd1700e5b2c910e70"
+  "hash": "05135dce719b1486943a14d8977c563385cf3e098e9c64ef6417701ccbc291c5"
 }

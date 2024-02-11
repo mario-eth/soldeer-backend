@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM revisions WHERE project_id = $1 AND deleted = FALSE",
+  "query": "UPDATE users SET password = $1 WHERE id = $2 RETURNING *",
   "describe": {
     "columns": [
       {
@@ -10,37 +10,38 @@
       },
       {
         "ordinal": 1,
-        "name": "version",
+        "name": "email",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "internal_name",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 3,
-        "name": "url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 4,
-        "name": "project_id",
-        "type_info": "Uuid"
-      },
-      {
-        "ordinal": 5,
-        "name": "deleted",
+        "name": "verified",
         "type_info": "Bool"
       },
       {
-        "ordinal": 6,
+        "ordinal": 3,
+        "name": "password",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "role",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
         "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
+        "Varchar",
         "Uuid"
       ]
     },
@@ -50,9 +51,9 @@
       false,
       false,
       false,
-      false,
+      true,
       true
     ]
   },
-  "hash": "c15222fcd3712dc1e4f6a4cb44a2762b7b5e4f3ba95da40d7b10b6e49bca49e6"
+  "hash": "ad57d49d087572f7f2d6b4250b31d2b2ed0092c901e4724ebc8192380162e1c6"
 }

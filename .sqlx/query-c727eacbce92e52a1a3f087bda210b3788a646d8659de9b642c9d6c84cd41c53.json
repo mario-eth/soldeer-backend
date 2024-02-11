@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE projects SET name = $1, description = $2, github_url = $3 WHERE id = $4 AND user_id = $5 RETURNING *",
+  "query": "UPDATE revisions SET downloads = downloads + 1 WHERE id = $1 RETURNING *",
   "describe": {
     "columns": [
       {
@@ -10,28 +10,28 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "version",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "description",
+        "name": "internal_name",
         "type_info": "Text"
       },
       {
         "ordinal": 3,
-        "name": "github_url",
+        "name": "url",
         "type_info": "Text"
       },
       {
         "ordinal": 4,
-        "name": "deleted",
-        "type_info": "Bool"
+        "name": "project_id",
+        "type_info": "Uuid"
       },
       {
         "ordinal": 5,
-        "name": "user_id",
-        "type_info": "Uuid"
+        "name": "deleted",
+        "type_info": "Bool"
       },
       {
         "ordinal": 6,
@@ -40,16 +40,12 @@
       },
       {
         "ordinal": 7,
-        "name": "updated_at",
-        "type_info": "Timestamptz"
+        "name": "downloads",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
       "Left": [
-        "Varchar",
-        "Text",
-        "Text",
-        "Uuid",
         "Uuid"
       ]
     },
@@ -64,5 +60,5 @@
       true
     ]
   },
-  "hash": "e9852d04c938f4fd3ab738868e453878eccd26c84ca0453202d2bae2689a2cba"
+  "hash": "c727eacbce92e52a1a3f087bda210b3788a646d8659de9b642c9d6c84cd41c53"
 }

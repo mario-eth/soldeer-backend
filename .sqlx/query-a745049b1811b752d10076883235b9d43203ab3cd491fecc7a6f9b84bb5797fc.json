@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE projects SET deleted = TRUE WHERE id = $1 AND user_id = $2 AND deleted = FALSE RETURNING *",
+  "query": "INSERT INTO projects (name, description, github_url, image, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
   "describe": {
     "columns": [
       {
@@ -61,7 +61,10 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
+        "Varchar",
+        "Text",
+        "Text",
+        "Text",
         "Uuid"
       ]
     },
@@ -79,5 +82,5 @@
       true
     ]
   },
-  "hash": "5734995c162ba0f8af155e52ae8126f3a6feaf712c05e69dd1700e5b2c910e70"
+  "hash": "a745049b1811b752d10076883235b9d43203ab3cd491fecc7a6f9b84bb5797fc"
 }

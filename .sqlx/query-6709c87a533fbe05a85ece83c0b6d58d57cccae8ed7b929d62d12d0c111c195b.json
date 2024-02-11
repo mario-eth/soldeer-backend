@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO projects (name, description, github_url, user_id) VALUES ($1, $2, $3, $4) RETURNING *",
+  "query": "SELECT * FROM users WHERE email = $1 AND verified = true",
   "describe": {
     "columns": [
       {
@@ -10,50 +10,41 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "email",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "description",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 3,
-        "name": "github_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 4,
-        "name": "deleted",
+        "name": "verified",
         "type_info": "Bool"
       },
       {
-        "ordinal": 5,
-        "name": "user_id",
-        "type_info": "Uuid"
+        "ordinal": 3,
+        "name": "password",
+        "type_info": "Varchar"
       },
       {
-        "ordinal": 6,
+        "ordinal": 4,
+        "name": "role",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Varchar",
-        "Text",
-        "Text",
-        "Uuid"
+        "Text"
       ]
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -63,5 +54,5 @@
       true
     ]
   },
-  "hash": "6f314f33a6017d88749a943bf8e1f10277301ebcd3112739230b5626b0e77859"
+  "hash": "6709c87a533fbe05a85ece83c0b6d58d57cccae8ed7b929d62d12d0c111c195b"
 }

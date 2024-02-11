@@ -84,7 +84,8 @@ async fn main() {
         env: config.clone(),
         aws_client: aws_s3_client.clone(),
     }))
-    .layer(cors);
+    .layer(CorsLayer::permissive());
+    // .layer(cors);
 
     println!("🚀 Server started successfully on {}", config.url);
 

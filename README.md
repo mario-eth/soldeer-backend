@@ -1,7 +1,7 @@
 
 
 # PRE-DEPLOY
-1. `cargo sqlx prepare` - needed to run the sqlx in offline mode, sqlx needs to query the database to generate the code, so we do this to avoid the connection to the db at compile time
+1. `cargo sqlx prepare -- --all-targets --all-features` - needed to run the sqlx in offline mode, sqlx needs to query the database to generate the code, so we do this to avoid the connection to the db at compile time
 2. `cargo build --release` - this might not be needed, need to investigate more
 3. create .env_docker file to store environment variables
 Example of the .env_docker file:

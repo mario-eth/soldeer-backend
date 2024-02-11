@@ -49,9 +49,10 @@ pub async fn add_project_handler(
     .fetch_one(&data.db)
     .await
     .map_err(|e| {
+        println!("Database error on add project: {}", e);
         let error_response = serde_json::json!({
             "status": "fail",
-            "message": format!("Database error: {}", e),
+            "message": "Error on adding the project",
         });
         (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
     })?;
@@ -69,18 +70,20 @@ pub async fn add_project_handler(
     let project = sqlx
         ::query_as!(
             Project,
-            "INSERT INTO projects (name, description, github_url, user_id) VALUES ($1, $2, $3, $4) RETURNING *",
+            "INSERT INTO projects (name, description, github_url, image, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
             escaped_name,
             body.description,
             body.github_url,
+            "https://soldeer-resources.s3.amazonaws.com/default_icon.png",
             user.id
         )
         .fetch_one(&data.db).await
         .map_err(|e| {
+            println!("Database error on add project: {}", e);
             let error_response =
                 serde_json::json!({
             "status": "fail",
-            "message": format!("Database error: {}", e),
+            "message": "Error on adding the project",
         });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?;
@@ -107,10 +110,11 @@ pub async fn update_project_handler(
         .bind(user.id)
         .fetch_one(&data.db).await
         .map_err(|e| {
+            println!("Database error on update project: {}", e);
             let error_response =
                 serde_json::json!({
             "status": "fail",
-            "message": format!("Database error: {}", e),
+            "message": "Error on updating the project",
         });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?;
@@ -125,19 +129,22 @@ pub async fn update_project_handler(
 
     let project = sqlx::query_as!(
             Project,
-            "UPDATE projects SET name = $1, description = $2, github_url = $3 WHERE id = $4 AND user_id = $5 RETURNING *",
+            "UPDATE projects SET name = $1, description = $2, github_url = $3, image = $4, long_description = $5 WHERE id = $6 AND user_id = $7 RETURNING *",
             escaped_name,
             body.description,
             body.github_url,
+            body.image,
+            body.long_description,
             body.id,
             user.id
         )
         .fetch_one(&data.db).await
         .map_err(|e| {
+            println!("Database error on update project: {}", e);
             let error_response =
                 serde_json::json!({
             "status": "fail",
-            "message": format!("Database error: {}", e),
+            "message": "Error on updating the project",
         });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?;
@@ -161,10 +168,11 @@ pub async fn delete_project_handler(
         )
         .fetch_one(&data.db).await
         .map_err(|e| {
+            println!("Database error on delete project: {}", e);
             let error_response =
                 serde_json::json!({
             "status": "fail",
-            "message": format!("Database error: {}", e),
+            "message": "Error on deleting the project",
         });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?;
@@ -205,9 +213,10 @@ pub async fn upload_revision(
             .fetch_one(&data.db)
             .await
             .map_err(|e| {
+                println!("Database error on upload revision: {}", e);
                 let error_response = serde_json::json!({
                     "status": "fail",
-                    "message": format!("Database error: {}", e),
+                    "message": "Error on uploading the revision",
                 });
                 (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
             })?;
@@ -231,10 +240,11 @@ pub async fn upload_revision(
                 .bind(project.id)
                 .fetch_one(&data.db).await
                 .map_err(|e| {
+                    println!("Database error on upload revision: {}", e);
                     let error_response =
                         serde_json::json!({
                     "status": "fail",
-                    "message": format!("Database error: {}", e),
+                    "message": "Error on uploading the revision",
                 });
                     (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
                 })?;
@@ -264,7 +274,10 @@ pub async fn upload_revision(
             return Err((StatusCode::NOT_FOUND, Json(error_response)));
         }
         let revision_name = revision.replace(".", "_");
-        println!("Revision ready to upload to aws s3 {} {}", &project.name, &revision_name);
+        println!(
+            "Revision ready to upload to aws s3 {} {}",
+            &project.name, &revision_name
+        );
         // file data
         let data = file.bytes().await.unwrap();
         // the path of file to store on aws s3 with file name and extension
@@ -275,6 +288,11 @@ pub async fn upload_revision(
             chrono::Utc::now().format("%d-%m-%Y_%H:%M:%S"),
             &name.replace(" ", "_")
         );
+
+        
+    
+   
+
 
         // send Putobject request to aws s3
         let _resp = aws_client
@@ -288,7 +306,7 @@ pub async fn upload_revision(
                 dbg!(err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"err": "an error ocurred during image upload"})),
+                    Json(serde_json::json!({"err": "an error ocurred during upload"})),
                 )
             })?;
     }
@@ -303,10 +321,11 @@ pub async fn upload_revision(
         )
         .fetch_one(&data.db).await
         .map_err(|e| {
+            println!("Database error on upload revision: {}", e);
             let error_response =
                 serde_json::json!({
             "status": "fail",
-            "message": format!("Database error: {}", e),
+            "message": "Error on uploading the revision",
         });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?;
@@ -322,12 +341,29 @@ pub async fn get_projects(
     Query(params): Query<FetchProjectsSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query: QueryAs<'_, Postgres, Project, PgArguments>;
+    let limit = params.limit.unwrap_or(10);
+    let offset = params.offset.unwrap_or(0);
     if params.project_id.is_some() {
-        query = sqlx::query_as("SELECT * FROM projects WHERE id = $1 AND deleted = FALSE")
-            .bind(params.project_id.unwrap());
+        query = sqlx::query_as(
+            "SELECT * FROM projects WHERE id = $1 AND deleted = FALSE ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
+        )
+        .bind(params.project_id.unwrap())
+        .bind(limit)
+        .bind(offset);
     } else if params.project_name.is_some() {
-        query = sqlx::query_as("SELECT * FROM projects WHERE name = $1 AND deleted = FALSE")
-            .bind(params.project_name.unwrap());
+        query = sqlx::query_as(
+            "SELECT * FROM projects WHERE name = $1 AND deleted = FALSE ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
+        )
+        .bind(params.project_name.unwrap())
+        .bind(limit)
+        .bind(offset);
+    } else if params.search.is_some() {
+        query = sqlx::query_as(
+            "SELECT * FROM projects WHERE name LIKE '%' || LOWER($1) || '%' ORDER BY updated_at LIMIT $2 OFFSET $3",
+        )
+        .bind(params.search.unwrap())
+        .bind(limit)
+        .bind(offset);
     } else {
         if params.user_id.is_none() {
             let error_response = serde_json::json!({
@@ -336,16 +372,21 @@ pub async fn get_projects(
             });
             return Err((StatusCode::BAD_REQUEST, Json(error_response)));
         }
-        query = sqlx::query_as("SELECT * FROM projects WHERE user_id = $1 AND deleted = FALSE")
-            .bind(params.user_id.unwrap());
+        query = sqlx::query_as(
+            "SELECT * FROM projects WHERE user_id = $1 AND deleted = FALSE ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
+        )
+        .bind(params.user_id.unwrap())
+        .bind(limit)
+        .bind(offset);
     }
     let projects: Vec<Project> = query
         .fetch_all(&data.db)
         .await
         .map_err(|e| {
+            println!("Database error on get projects: {}", e);
             let error_response = serde_json::json!({
                 "status": "fail",
-                "message": format!("Database error: {}", e),
+                "message": "Error on fetching the projects",
             });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?
@@ -358,6 +399,9 @@ pub async fn get_projects(
                 github_url: project.github_url.clone(),
                 user_id: project.user_id,
                 deleted: project.deleted,
+                downloads: project.downloads,
+                image: project.image.clone(),
+                long_description: project.long_description.clone(),
                 created_at: project.created_at,
                 updated_at: project.updated_at,
             }
@@ -374,8 +418,9 @@ pub async fn get_project_revisions(
     Query(params): Query<FetchRevisionsSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query: QueryAs<'_, Postgres, Revision, PgArguments>;
-    println!("params: {:?}", params);
     let project: Project;
+    let limit = params.limit.unwrap_or(10);
+    let offset = params.offset.unwrap_or(0);
     if params.project_name.is_some() {
         project = sqlx::query_as!(
             Project,
@@ -385,9 +430,10 @@ pub async fn get_project_revisions(
         .fetch_one(&data.db)
         .await
         .map_err(|e| {
+            println!("Database error on get project revisions: {}", e);
             let error_response = serde_json::json!({
                 "status": "fail",
-                "message": format!("Database error: {}", e),
+                "message": "Error on retrieving the revisions",
             });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?;
@@ -400,9 +446,10 @@ pub async fn get_project_revisions(
         .fetch_one(&data.db)
         .await
         .map_err(|e| {
+            println!("Database error on get project revisions: {}", e);
             let error_response = serde_json::json!({
                 "status": "fail",
-                "message": format!("Database error: {}", e),
+                "message": "Error on retrieving the revisions",
             });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?;
@@ -410,20 +457,24 @@ pub async fn get_project_revisions(
         project = Project::default();
     }
 
-    println!("project: {:?}", project);
-
     if params.revision.is_some() {
         query = sqlx::query_as(
-            "SELECT * FROM revisions WHERE project_id = $1 AND version = $2 AND deleted = FALSE",
+            "SELECT * FROM revisions WHERE project_id = $1 AND version = $2 AND deleted = FALSE ORDER BY created_at DESC LIMIT $3 OFFSET $4",
         )
         .bind(project.id)
-        .bind(params.revision.unwrap());
+        .bind(params.revision.unwrap())
+        .bind(limit)
+        .bind(offset);
     } else if params.project_name.is_some() {
-        query = sqlx::query_as("SELECT * FROM revisions WHERE project_id = $1 AND deleted = FALSE")
-            .bind(project.id);
+        query = sqlx::query_as(
+            "SELECT * FROM revisions WHERE project_id = $1 AND deleted = FALSE ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+        )
+        .bind(project.id)
+        .bind(limit)
+        .bind(offset);
     } else if params.revision_id.is_some() {
         query = sqlx::query_as("SELECT * FROM revisions WHERE id = $1 AND deleted = FALSE")
-            .bind(params.project_id.unwrap());
+            .bind(params.revision_id.unwrap());
     } else {
         let error_response = serde_json::json!({
             "status": "fail",
@@ -435,9 +486,10 @@ pub async fn get_project_revisions(
         .fetch_all(&data.db)
         .await
         .map_err(|e| {
+            println!("Database error on get project revisions: {}", e);
             let error_response = serde_json::json!({
                 "status": "fail",
-                "message": format!("Database error: {}", e),
+                "message": "Error on retrieving the revisions",
             });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
         })?
@@ -449,12 +501,125 @@ pub async fn get_project_revisions(
                 internal_name: revision.internal_name.clone(),
                 url: revision.url.clone(),
                 project_id: revision.project_id,
+                downloads: revision.downloads,
                 deleted: revision.deleted,
                 created_at: revision.created_at,
             }
         })
         .collect();
-    println!("revisions: {:?}", revisions);
+
+    let revision_response = serde_json::json!({"status": "success","data": revisions});
+    Ok(Json(revision_response))
+}
+
+pub async fn get_project_revisions_cli(
+    State(data): State<Arc<AppState>>,
+    Query(params): Query<FetchRevisionsSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let query: QueryAs<'_, Postgres, Revision, PgArguments>;
+    let project: Project;
+    if params.project_name.is_some() {
+        project = sqlx::query_as!(
+            Project,
+            "SELECT * FROM projects WHERE name = $1 AND deleted = FALSE",
+            params.project_name.as_ref().unwrap(),
+        )
+        .fetch_one(&data.db)
+        .await
+        .map_err(|e| {
+            println!("Database error on get project revisions: {}", e);
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": "Error on retrieving the revisions",
+            });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?;
+    } else {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": format!("The project_name parameters is missing"),
+        });
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
+    }
+
+    if params.revision.is_some() {
+        query = sqlx::query_as(
+            "SELECT * FROM revisions WHERE project_id = $1 AND version = $2 AND deleted = FALSE",
+        )
+        .bind(project.id)
+        .bind(params.revision.unwrap());
+    } else {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": format!("The revision parameters is missing"),
+        });
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
+    }
+    let revisions: Vec<Revision> = query
+        .fetch_all(&data.db)
+        .await
+        .map_err(|e| {
+            println!("Database error on get project revisions: {}", e);
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": "Error on retrieving the revisions",
+            });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?
+        .iter()
+        .map(|revision| {
+            Revision {
+                id: revision.id,
+                version: revision.version.clone(),
+                internal_name: revision.internal_name.clone(),
+                url: revision.url.clone(),
+                project_id: revision.project_id,
+                downloads: revision.downloads,
+                deleted: revision.deleted,
+                created_at: revision.created_at,
+            }
+        })
+        .collect();
+
+    if revisions.is_empty() {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "No revisions found",
+        });
+        return Err((StatusCode::NOT_FOUND, Json(error_response)));
+    }
+
+    let _ = sqlx::query_as!(
+        Project,
+        "UPDATE projects SET downloads = downloads + 1 WHERE id = $1 RETURNING *",
+        project.id
+    )
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Database error on get project revisions: {}", e);
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Error on updating the project downloads",
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?;
+    let _ = sqlx::query_as!(
+        Revision,
+        "UPDATE revisions SET downloads = downloads + 1 WHERE id = $1 RETURNING *",
+        revisions[0].id
+    )
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Database error on get project revisions: {}", e);
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Error on updating the revision downloads",
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?;
+
     let revision_response = serde_json::json!({"status": "success","data": revisions});
     Ok(Json(revision_response))
 }
