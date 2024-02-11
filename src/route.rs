@@ -24,7 +24,6 @@ use crate::{
         upload_revision,
     },
     user_handler::{
-        get_last_code_handler, // TODO REMOVE IN PROD
         get_me_handler,
         health_checker_handler,
         login_user_handler,

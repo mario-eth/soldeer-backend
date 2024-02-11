@@ -57,7 +57,7 @@ async fn main() {
         }
     };
 
-    let cors: CorsLayer = CorsLayer::new()
+    let _cors: CorsLayer = CorsLayer::new()
         .allow_origin(config.url.parse::<HeaderValue>().unwrap())
         .allow_methods([
             Method::GET,

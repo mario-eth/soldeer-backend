@@ -482,7 +482,7 @@ pub async fn send_verification_email(
     let verification_link = format!(
         "https://{}/verify?token={}",
         base_url,
-        verification.id.to_string()
+        verification.id
     );
 
     let mut dest: Destination = Destination::builder().build();
@@ -592,7 +592,7 @@ pub async fn send_request_new_password_email(
     let verification_link = format!(
         "https://{}/reset-password?token={}",
         base_url,
-        verification.id.to_string()
+        verification.id
     );
 
     let mut dest: Destination = Destination::builder().build();
@@ -646,7 +646,7 @@ pub async fn reset_password_handler(
         return Err((StatusCode::BAD_REQUEST, Json(error_response)));
     }
 
-    let mut verification = sqlx::query_as!(
+    let verification = sqlx::query_as!(
         Verification,
         "SELECT * FROM verifications WHERE id = $1 AND verification_type = $2",
         body.code,
@@ -691,7 +691,7 @@ pub async fn reset_password_handler(
         })
         .map(|hash| hash.to_string())?;
 
-    let user = sqlx::query_as!(
+    let _user = sqlx::query_as!(
         User,
         "UPDATE users SET password = $1 WHERE id = $2 RETURNING *",
         hashed_password,
@@ -708,7 +708,7 @@ pub async fn reset_password_handler(
         (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
     })?;
 
-    verification = sqlx::query_as!(
+    let _ = sqlx::query_as!(
         Verification,
         "UPDATE verifications SET used = true WHERE id = $1 RETURNING *",
         body.code

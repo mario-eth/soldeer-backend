@@ -273,7 +273,7 @@ pub async fn upload_revision(
             });
             return Err((StatusCode::NOT_FOUND, Json(error_response)));
         }
-        let revision_name = revision.replace(".", "_");
+        let revision_name = revision.replace('.', "_");
         println!(
             "Revision ready to upload to aws s3 {} {}",
             &project.name, &revision_name
@@ -286,7 +286,7 @@ pub async fn upload_revision(
             &project.name,
             &revision_name,
             chrono::Utc::now().format("%d-%m-%Y_%H:%M:%S"),
-            &name.replace(" ", "_")
+            &name.replace(' ', "_")
         );
 
         
@@ -516,10 +516,9 @@ pub async fn get_project_revisions_cli(
     State(data): State<Arc<AppState>>,
     Query(params): Query<FetchRevisionsSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let query: QueryAs<'_, Postgres, Revision, PgArguments>;
-    let project: Project;
-    if params.project_name.is_some() {
-        project = sqlx::query_as!(
+    
+    let project: Project = if params.project_name.is_some() {
+          sqlx::query_as!(
             Project,
             "SELECT * FROM projects WHERE name = $1 AND deleted = FALSE",
             params.project_name.as_ref().unwrap(),
@@ -533,28 +532,29 @@ pub async fn get_project_revisions_cli(
                 "message": "Error on retrieving the revisions",
             });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
-        })?;
+        })?
     } else {
         let error_response = serde_json::json!({
             "status": "fail",
             "message": format!("The project_name parameters is missing"),
         });
         return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
-    }
+    };
 
-    if params.revision.is_some() {
-        query = sqlx::query_as(
+    
+    let query: QueryAs<'_, Postgres, Revision, PgArguments>= if params.revision.is_some() {
+         sqlx::query_as(
             "SELECT * FROM revisions WHERE project_id = $1 AND version = $2 AND deleted = FALSE",
         )
         .bind(project.id)
-        .bind(params.revision.unwrap());
+        .bind(params.revision.unwrap())
     } else {
         let error_response = serde_json::json!({
             "status": "fail",
             "message": format!("The revision parameters is missing"),
         });
         return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
-    }
+    };
     let revisions: Vec<Revision> = query
         .fetch_all(&data.db)
         .await
@@ -630,7 +630,7 @@ fn validate_add_project_params(
     github_url: &str,
 ) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
     let pattern_name = Regex::new(r"^[@|a-z][a-z0-9-]*[a-z]$").unwrap();
-    if !pattern_name.is_match(&name) {
+    if !pattern_name.is_match(name) {
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Invalid project name",
@@ -655,7 +655,7 @@ fn validate_add_project_params(
     }
 
     let pattern_github = Regex::new(r"^https:\/\/github\.com\/[^\s?#]+(?:\/[^\s?#]+)*$").unwrap();
-    if !pattern_github.is_match(&github_url) {
+    if !pattern_github.is_match(github_url) {
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Invalid github url",
