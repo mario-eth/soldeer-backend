@@ -213,12 +213,12 @@ pub async fn upload_revision(
             .fetch_one(&data.db)
             .await
             .map_err(|e| {
-                println!("Database error on upload revision: {}", e);
+                println!("Database error on upload revision on project search: {}", e);
                 let error_response = serde_json::json!({
                     "status": "fail",
-                    "message": "Error on uploading the revision",
+                    "message": "Error on uploading the revision, the project is invalid or you are not the owner.",
                 });
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+                (StatusCode::NO_CONTENT, Json(error_response))
             })?;
             continue;
         } else if field_name == "revision" {
@@ -240,7 +240,7 @@ pub async fn upload_revision(
                 .bind(project.id)
                 .fetch_one(&data.db).await
                 .map_err(|e| {
-                    println!("Database error on upload revision: {}", e);
+                    println!("Database error on upload revision on revision existing check: {}", e);
                     let error_response =
                         serde_json::json!({
                     "status": "fail",
@@ -254,7 +254,7 @@ pub async fn upload_revision(
                     "status": "fail",
                     "message": "This revision already exists",
                 });
-                return Err((StatusCode::NOT_FOUND, Json(error_response)));
+                return Err((StatusCode::ALREADY_REPORTED, Json(error_response)));
             }
             continue;
         }
@@ -289,11 +289,6 @@ pub async fn upload_revision(
             &name.replace(' ', "_")
         );
 
-        
-    
-   
-
-
         // send Putobject request to aws s3
         let _resp = aws_client
             .put_object()
@@ -321,7 +316,7 @@ pub async fn upload_revision(
         )
         .fetch_one(&data.db).await
         .map_err(|e| {
-            println!("Database error on upload revision: {}", e);
+            println!("Database error on upload revision on insert revision: {}", e);
             let error_response =
                 serde_json::json!({
             "status": "fail",
@@ -516,9 +511,8 @@ pub async fn get_project_revisions_cli(
     State(data): State<Arc<AppState>>,
     Query(params): Query<FetchRevisionsSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    
     let project: Project = if params.project_name.is_some() {
-          sqlx::query_as!(
+        sqlx::query_as!(
             Project,
             "SELECT * FROM projects WHERE name = $1 AND deleted = FALSE",
             params.project_name.as_ref().unwrap(),
@@ -541,9 +535,8 @@ pub async fn get_project_revisions_cli(
         return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
     };
 
-    
-    let query: QueryAs<'_, Postgres, Revision, PgArguments>= if params.revision.is_some() {
-         sqlx::query_as(
+    let query: QueryAs<'_, Postgres, Revision, PgArguments> = if params.revision.is_some() {
+        sqlx::query_as(
             "SELECT * FROM revisions WHERE project_id = $1 AND version = $2 AND deleted = FALSE",
         )
         .bind(project.id)

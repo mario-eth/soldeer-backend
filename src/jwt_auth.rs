@@ -49,7 +49,9 @@ pub async fn auth(
                 .get(header::AUTHORIZATION)
                 .and_then(|auth_header| auth_header.to_str().ok())
                 .and_then(|auth_value| {
-                    auth_value.strip_prefix("Bearer ").map(|bearer| bearer.to_owned())
+                    auth_value
+                        .strip_prefix("Bearer ")
+                        .map(|bearer| bearer.to_owned())
                 })
         });
 

@@ -47,3 +47,8 @@ The network is `soldeer-backend_default` because that's how the postgres is buil
 
 ### Reference article for general axum server with sqlx
 https://codevoweb.com/jwt-authentication-in-rust-using-axum-framework/
+
+### RUN LOCALLY
+```bash
+cargo watch -q -c -w src/ -x run
+```

@@ -479,11 +479,7 @@ pub async fn send_verification_email(
     })
     .unwrap();
 
-    let verification_link = format!(
-        "https://{}/verify?token={}",
-        base_url,
-        verification.id
-    );
+    let verification_link = format!("https://{}/verify?token={}", base_url, verification.id);
 
     let mut dest: Destination = Destination::builder().build();
     dest.to_addresses = Some(vec![email]);
@@ -591,8 +587,7 @@ pub async fn send_request_new_password_email(
 
     let verification_link = format!(
         "https://{}/reset-password?token={}",
-        base_url,
-        verification.id
+        base_url, verification.id
     );
 
     let mut dest: Destination = Destination::builder().build();
