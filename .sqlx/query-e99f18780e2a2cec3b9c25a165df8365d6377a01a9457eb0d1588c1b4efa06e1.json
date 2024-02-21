@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE projects SET name = $1, description = $2, github_url = $3, image = $4, long_description = $5 WHERE id = $6 AND user_id = $7 RETURNING *",
+  "query": "INSERT INTO projects (name, description, long_description, github_url, image, user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
   "describe": {
     "columns": [
       {
@@ -66,7 +66,6 @@
         "Text",
         "Text",
         "Text",
-        "Uuid",
         "Uuid"
       ]
     },
@@ -84,5 +83,5 @@
       true
     ]
   },
-  "hash": "0a0ab228fb7ecd5f20a299db37804f07544c7bc72a28eedd3dd5e3906e657e8f"
+  "hash": "e99f18780e2a2cec3b9c25a165df8365d6377a01a9457eb0d1588c1b4efa06e1"
 }

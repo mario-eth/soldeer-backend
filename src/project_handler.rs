@@ -70,9 +70,10 @@ pub async fn add_project_handler(
     let project = sqlx
         ::query_as!(
             Project,
-            "INSERT INTO projects (name, description, github_url, image, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+            "INSERT INTO projects (name, description, long_description, github_url, image, user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
             escaped_name,
             body.description,
+            body.long_description,
             body.github_url,
             "https://soldeer-resources.s3.amazonaws.com/default_icon.png",
             user.id
@@ -99,25 +100,23 @@ pub async fn update_project_handler(
     State(data): State<Arc<AppState>>,
     Json(body): Json<UpdateProjectSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let escaped_name = body.name.to_ascii_lowercase();
-    validate_add_project_params(&escaped_name, &body.description, &body.github_url)?;
+    validate_update_project_params(&body.description, &body.long_description, &body.github_url)?;
 
-    let project_exists: Option<bool> = sqlx
-        ::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM projects WHERE name = $1 AND user_id = $2 AND deleted = FALSE)"
-        )
-        .bind(escaped_name.to_owned())
-        .bind(user.id)
-        .fetch_one(&data.db).await
-        .map_err(|e| {
-            println!("Database error on update project: {}", e);
-            let error_response =
-                serde_json::json!({
+    let project_exists: Option<bool> = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM projects WHERE id = $1 AND user_id = $2 AND deleted = FALSE)",
+    )
+    .bind(body.id)
+    .bind(user.id)
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Database error on update project: {}", e);
+        let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error on updating the project",
         });
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
-        })?;
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?;
 
     if project_exists.is_none() {
         let error_response = serde_json::json!({
@@ -129,11 +128,10 @@ pub async fn update_project_handler(
 
     let project = sqlx::query_as!(
             Project,
-            "UPDATE projects SET name = $1, description = $2, github_url = $3, image = $4, long_description = $5 WHERE id = $6 AND user_id = $7 RETURNING *",
-            escaped_name,
+            "UPDATE projects SET description = $1, github_url = $2, image = $3, long_description = $4 WHERE id = $5 AND user_id = $6 RETURNING *",
             body.description,
             body.github_url,
-            body.image,
+            "https://soldeer-resources.s3.amazonaws.com/default_icon.png",
             body.long_description,
             body.id,
             user.id
@@ -622,7 +620,7 @@ fn validate_add_project_params(
     description: &str,
     github_url: &str,
 ) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
-    let pattern_name = Regex::new(r"^[@|a-z][a-z0-9-]*[a-z]$").unwrap();
+    let pattern_name = Regex::new(r"^[@|a-z0-9][a-z0-9-]*[a-z0-9]$").unwrap();
     if !pattern_name.is_match(name) {
         let error_response = serde_json::json!({
             "status": "fail",
@@ -643,6 +641,39 @@ fn validate_add_project_params(
         let error_response = json!({
             "status": "fail",
             "message": "Project description must be greater than 3 characters",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    let pattern_github = Regex::new(r"^https:\/\/github\.com\/[^\s?#]+(?:\/[^\s?#]+)*$").unwrap();
+    if !pattern_github.is_match(github_url) {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Invalid github url",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    Ok(())
+}
+
+fn validate_update_project_params(
+    description: &str,
+    long_description: &str,
+    github_url: &str,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    if description.len() < 3 {
+        let error_response = json!({
+            "status": "fail",
+            "message": "Project description must be greater than 3 characters",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    if long_description.len() < 3 {
+        let error_response = json!({
+            "status": "fail",
+            "message": "Project long description must be greater than 3 characters",
         });
         return Err((StatusCode::BAD_REQUEST, Json(error_response)));
     }

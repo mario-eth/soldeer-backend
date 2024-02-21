@@ -100,13 +100,13 @@ pub struct Verification {
 pub struct CreateProjectSchema {
     pub name: String,
     pub description: String,
+    pub long_description: String,
     pub github_url: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateProjectSchema {
     pub id: uuid::Uuid,
-    pub name: String,
     pub description: String,
     pub github_url: String,
     pub image: String,
