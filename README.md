@@ -29,6 +29,12 @@ AWS_SECRET_ACCESS_KEY=KKK....K
 AWS_DEFAULT_REGION=region
 AWS_S3_BUCKET=bucket_name
 AWS_BUCKET_URL=aws_bucket_url
+
+
+GITHUB_CLIENT_ID=EXAMPLE_CLIENT_ID
+GITHUB_REDIRECT_URI=http://localhost:3000/api/v1/auth/github/callback
+GITHUB_CLIENT_SECRET=EXAMPLE_CLIENT_SECRET
+
 ```
 
 Make sure you replace all the secrets correctly

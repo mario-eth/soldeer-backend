@@ -272,6 +272,13 @@ pub async fn upload_revision(
             return Err((StatusCode::NOT_FOUND, Json(error_response)));
         }
         let revision_name = revision.replace('.', "_");
+        if revision_name.trim().is_empty() {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": "The revision is empty",
+            });
+            return Err((StatusCode::NOT_FOUND, Json(error_response)));
+        }
         println!(
             "Revision ready to upload to aws s3 {} {}",
             &project.name, &revision_name
