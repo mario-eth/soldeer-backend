@@ -25,6 +25,7 @@ use crate::{
     },
     user_handler::{
         // get_last_code_handler,
+        get_last_code_handler,
         get_me_handler,
         github_callback_handler,
         github_login_handler,
@@ -46,7 +47,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         .route("/api/v1/auth/register", post(register_user_handler))
         .route("/api/v1/auth/login", post(login_user_handler))
         .route("/api/v1/auth/github", get(github_login_handler))
-        .route("/api/v1/auth/github/callback", get(github_callback_handler))
+        .route("/api/v1/auth/github", post(github_callback_handler))
         .route("/api/v1/verify", post(verify_account_handler))
         .route(
             "/api/v1/request-password",

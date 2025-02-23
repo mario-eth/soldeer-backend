@@ -42,6 +42,7 @@ use std::str::FromStr;
 
 use crate::{
     model::{
+        GetLastCodeSchema,
         GithubCallbackSchema,
         LoginUserSchema,
         RegisterUserSchema,
@@ -228,41 +229,42 @@ pub async fn get_me_handler(
     Ok(Json(json_response))
 }
 
-// pub async fn get_last_code_handler(
-//     State(data): State<Arc<AppState>>,
-//     Query(params): Query<GetLastCodeSchema>,
-// ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-//     let verification = sqlx::query_as!(
-//         Verification,
-//         "SELECT * FROM verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
-//         params.user_id
-//     )
-//     .fetch_optional(&data.db)
-//     .await
-//     .map_err(|e| {
-//         let error_response = serde_json::json!({
-//             "status": "fail",
-//             "message": format!("Database error: {}", e),
-//         });
-//         (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
-//     })?
-//     .ok_or_else(|| {
-//         let error_response = serde_json::json!({
-//             "status": "fail",
-//             "message": "No verification code found",
-//         });
-//         (StatusCode::NOT_FOUND, Json(error_response))
-//     })?;
+#[allow(dead_code)]
+pub async fn get_last_code_handler(
+    State(data): State<Arc<AppState>>,
+    Query(params): Query<GetLastCodeSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let verification = sqlx::query_as!(
+        Verification,
+        "SELECT * FROM verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+        params.user_id
+    )
+    .fetch_optional(&data.db)
+    .await
+    .map_err(|e| {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": format!("Database error: {}", e),
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?
+    .ok_or_else(|| {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "No verification code found",
+        });
+        (StatusCode::NOT_FOUND, Json(error_response))
+    })?;
 
-//     let json_response = serde_json::json!({
-//         "status": "success",
-//         "data": serde_json::json!({
-//             "code": verification.id.to_string()
-//         })
-//     });
+    let json_response = serde_json::json!({
+        "status": "success",
+        "data": serde_json::json!({
+            "code": verification.id.to_string()
+        })
+    });
 
-//     Ok(Json(json_response))
-// }
+    Ok(Json(json_response))
+}
 
 pub async fn verify_account_handler(
     State(data): State<Arc<AppState>>,
@@ -546,13 +548,12 @@ pub async fn github_login_handler(
 
 pub async fn github_callback_handler(
     State(data): State<Arc<AppState>>,
-    Query(params): Query<GithubCallbackSchema>,
+    Json(body): Json<GithubCallbackSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let client_id = data.env.github_client_id.clone();
     let client_secret = data.env.github_client_secret.clone();
 
-    let access_token = match exchange_code_for_token(&params.code, &client_id, &client_secret).await
-    {
+    let access_token = match exchange_code_for_token(&body.code, &client_id, &client_secret).await {
         Ok(token) => token,
         Err(e) => return Err(e),
     };
@@ -562,16 +563,17 @@ pub async fn github_callback_handler(
         Err(e) => return Err(e),
     };
 
-    let user_existence = match check_login_or_register(&primary_email, &github_id, &data.db).await {
-        Ok(existence) => existence,
-        Err(e) => {
-            let error_response = serde_json::json!({
-                "status": "fail",
-                "message": format!("Failed to check or register user: {}", e)
-            });
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
-        }
-    };
+    let user_existence =
+        match check_login_or_register(&primary_email, &github_id, &username, &data.db).await {
+            Ok(existence) => existence,
+            Err(e) => {
+                let error_response = serde_json::json!({
+                    "status": "fail",
+                    "message": format!("Failed to check or register user: {}", e)
+                });
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));
+            }
+        };
 
     if user_existence.is_some() {
         let cookie = generate_token(
@@ -873,7 +875,6 @@ async fn get_github_data(
     access_token: &str,
 ) -> Result<(String, String, String), (StatusCode, Json<serde_json::Value>)> {
     let client = reqwest::Client::new();
-
     // Get user data from GitHub
     let user_response = client
         .get("https://api.github.com/user")
@@ -984,9 +985,10 @@ fn generate_token<'a>(id: String, jwt_secret: &str, jwt_expires_in: &str) -> Coo
 async fn check_login_or_register(
     email: &str,
     github_id: &str,
+    username: &str,
     db: &sqlx::Pool<sqlx::Postgres>,
 ) -> Result<Option<User>, Error> {
-    let user = sqlx::query_as!(
+    let user_results = sqlx::query_as!(
         User,
         "SELECT * FROM users WHERE email = $1 OR github_id = $2",
         email,
@@ -1002,8 +1004,19 @@ async fn check_login_or_register(
         });
         (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
     });
-
-    Ok(user.unwrap_or(None))
+    let user = user_results.unwrap_or(None);
+    if user.is_some() && user.as_ref().unwrap().github_id.is_none() {
+        let _=  sqlx::query_as!(
+            User,
+            "UPDATE users SET github_id = $1, github_username = $2, verified = true WHERE id = $3 RETURNING *",
+            github_id,
+            username,
+            &user.as_ref().unwrap().id
+        )
+        .fetch_one(db)
+        .await;
+    }
+    Ok(user)
 }
 
 async fn register_user_db(

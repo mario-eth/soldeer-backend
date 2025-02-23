@@ -153,11 +153,11 @@ pub struct UpdateUserSchema {
 pub struct VerifyEmailSchema {
     pub code: uuid::Uuid,
 }
-
-// #[derive(Debug, Deserialize)]
-// pub struct GetLastCodeSchema {
-//     pub user_id: uuid::Uuid,
-// }
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct GetLastCodeSchema {
+    pub user_id: uuid::Uuid,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct RequestPasswordSchema {
