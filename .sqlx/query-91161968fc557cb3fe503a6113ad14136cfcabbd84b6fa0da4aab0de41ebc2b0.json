@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE users SET password = $1 WHERE id = $2 RETURNING *",
+  "query": "SELECT * FROM users WHERE email = $1 OR github_id = $2",
   "describe": {
     "columns": [
       {
@@ -51,8 +51,8 @@
     ],
     "parameters": {
       "Left": [
-        "Varchar",
-        "Uuid"
+        "Text",
+        "Text"
       ]
     },
     "nullable": [
@@ -67,5 +67,5 @@
       true
     ]
   },
-  "hash": "ad57d49d087572f7f2d6b4250b31d2b2ed0092c901e4724ebc8192380162e1c6"
+  "hash": "91161968fc557cb3fe503a6113ad14136cfcabbd84b6fa0da4aab0de41ebc2b0"
 }

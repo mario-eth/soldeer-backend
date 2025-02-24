@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO users (email,password,role) VALUES ($1, $2, $3) RETURNING *",
+  "query": "UPDATE users SET github_id = $1, github_username = $2, verified = true WHERE id = $3 RETURNING *",
   "describe": {
     "columns": [
       {
@@ -37,13 +37,23 @@
         "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "github_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "github_username",
+        "type_info": "Text"
       }
     ],
     "parameters": {
       "Left": [
-        "Varchar",
-        "Varchar",
-        "Varchar"
+        "Text",
+        "Text",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -53,8 +63,10 @@
       false,
       false,
       true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "9dbeaef381967d9d32234bf5eb81665e4807d17215516c3aa8e4e0b4f2bbef1b"
+  "hash": "14b5f7a84b11c7094c4cc1fc251bcd5574ae3e7c6df98608b7afb4cc0acd39b1"
 }

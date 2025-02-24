@@ -74,7 +74,7 @@ async fn main() {
 
     // the aws credentials from environment
     let aws_configuration: aws_config::SdkConfig =
-        aws_config::load_defaults(BehaviorVersion::v2023_11_09()).await;
+        aws_config::load_defaults(BehaviorVersion::v2024_03_28()).await;
 
     //create aws s3 client
     let aws_s3_client: Client = Client::new(&aws_configuration);

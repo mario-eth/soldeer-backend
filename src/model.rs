@@ -13,6 +13,8 @@ pub struct User {
     pub password: String,
     pub role: String,
     pub verified: bool,
+    pub github_id: Option<String>,
+    pub github_username: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -109,20 +111,7 @@ pub struct UpdateProjectSchema {
     pub id: uuid::Uuid,
     pub description: String,
     pub github_url: String,
-    pub image: String,
     pub long_description: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct DeleteProjectSchema {
-    pub id: uuid::Uuid,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateRevisionSchema {
-    pub version: String,
-    pub url: String,
-    pub project_id: uuid::Uuid,
 }
 
 #[derive(Debug, Deserialize)]
@@ -164,7 +153,7 @@ pub struct UpdateUserSchema {
 pub struct VerifyEmailSchema {
     pub code: uuid::Uuid,
 }
-
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct GetLastCodeSchema {
     pub user_id: uuid::Uuid,
@@ -192,4 +181,9 @@ pub struct ResetPasswordSchema {
     pub code: uuid::Uuid,
     pub password: String,
     pub repeat_password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GithubCallbackSchema {
+    pub code: String,
 }

@@ -25,7 +25,10 @@ use crate::{
     },
     user_handler::{
         // get_last_code_handler,
+        get_last_code_handler,
         get_me_handler,
+        github_callback_handler,
+        github_login_handler,
         health_checker_handler,
         login_user_handler,
         logout_handler,
@@ -43,6 +46,8 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         .route("/api/v1/healthchecker", get(health_checker_handler))
         .route("/api/v1/auth/register", post(register_user_handler))
         .route("/api/v1/auth/login", post(login_user_handler))
+        .route("/api/v1/auth/github", get(github_login_handler))
+        .route("/api/v1/auth/github", post(github_callback_handler))
         .route("/api/v1/verify", post(verify_account_handler))
         .route(
             "/api/v1/request-password",
@@ -86,7 +91,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
             "/api/v1/revision/upload",
             post(upload_revision)
                 .route_layer(middleware::from_fn_with_state(app_state.clone(), auth))
-                .layer(DefaultBodyLimit::max(52428800)),
+                .layer(DefaultBodyLimit::max(314572800)),
         )
         // .route("/api/v1/get_last_code", get(get_last_code_handler)) // TODO THIS NEEDS TO BE REMOVED IN PROD
         .with_state(app_state)

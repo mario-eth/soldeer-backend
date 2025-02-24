@@ -1,32 +1,33 @@
 [package]
+edition = "2021"
 name = "soldeer-backend"
 version = "0.1.0"
-edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-argon2 = "0.5.2"
+argon2 = "0.5.3"
 aws-config = "1.1.4"
 aws-sdk-s3 = "1.14.0"
-axum = "0.7.2"
-axum-extra = { version = "0.9.0", features = ["cookie"] }
-axum_typed_multipart = "0.11.0"
-chrono = { version = "0.4.31", features = ["serde"] }
+aws-sdk-sesv2 = "1.12.0"
+axum = "0.8.1"
+axum-extra = {version = "0.10.0", features = ["cookie"]}
+axum_typed_multipart = "0.15.1"
+chrono = {version = "0.4.31", features = ["serde"]}
 dotenv = "0.15.0"
 email-address-parser = "2.0.0"
 jsonwebtoken = "9.2.0"
+openssl = {version = "0.10.62", features = ["vendored"]}
 passwords = "3.1.16"
-rand_core = { version = "0.6.4", features = ["std"] }
+rand_core = {version = "0.6.4", features = ["std"]}
 regex = "1.10.2"
-serde = { version = "1.0.193", features = ["derive"] }
+serde = {version = "1.0.193", features = ["derive"]}
 serde_json = "1.0.108"
-sqlx = { version = "0.7.3", features = ["runtime-async-std-native-tls", "postgres", "chrono", "uuid"] }
-time = "0.3.30"
-tokio = { version = "1.35.0", features = ["full"] }
-tower-http = { version = "0.5.0", features = ["cors"] }
+sqlx = {version = "0.8.3", features = ["runtime-async-std-native-tls", "postgres", "chrono", "uuid"]}
+time = "0.3.35"
+tokio = {version = "1.35.0", features = ["full"]}
+tower-http = {version = "0.6.2", features = ["cors"]}
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
-uuid = { version = "1.7", features = ["serde", "v4"] }
-openssl = { version = "0.10.62", features = ["vendored"] }
-aws-sdk-sesv2 = "1.12.0"
+uuid = {version = "1.7", features = ["serde", "v4"]}
+reqwest = {version = "0.12.11", features = ["json"]}

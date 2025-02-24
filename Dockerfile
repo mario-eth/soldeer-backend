@@ -1,7 +1,7 @@
 # Build Stage
 ARG SQLX_OFFLINE=true
 
-FROM rust:1.74.0 as builder
+FROM rust:1.82.0 as builder
 
 RUN USER=root cargo new --bin soldeer-backend
 WORKDIR /soldeer-backend
@@ -20,7 +20,7 @@ RUN cargo build --release
 FROM ubuntu:24.04
 ARG APP=/usr/src/app
 ARG SQLX_OFFLINE=true
-COPY . .
+# COPY . .
 
 RUN apt-get update && apt install -y openssl
 
