@@ -37,6 +37,16 @@
         "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "github_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "github_username",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -50,6 +60,8 @@
       false,
       false,
       false,
+      true,
+      true,
       true,
       true
     ]

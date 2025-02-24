@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE users SET password = $1 WHERE id = $2 RETURNING *",
+  "query": "INSERT INTO users (email,password,role,github_id,github_username,verified) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
   "describe": {
     "columns": [
       {
@@ -52,7 +52,11 @@
     "parameters": {
       "Left": [
         "Varchar",
-        "Uuid"
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Text",
+        "Bool"
       ]
     },
     "nullable": [
@@ -67,5 +71,5 @@
       true
     ]
   },
-  "hash": "ad57d49d087572f7f2d6b4250b31d2b2ed0092c901e4724ebc8192380162e1c6"
+  "hash": "82250a98edb51f8aa5c55b94883169be014bad0c83fff61d268f39c406866721"
 }
