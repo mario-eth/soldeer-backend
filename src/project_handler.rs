@@ -252,6 +252,7 @@ pub async fn upload_revision(
                     "status": "fail",
                     "message": "This revision already exists",
                 });
+                println!("Revision already exists");
                 return Err((StatusCode::ALREADY_REPORTED, Json(error_response)));
             }
             continue;
@@ -269,6 +270,7 @@ pub async fn upload_revision(
                 "status": "fail",
                 "message": "The revision is not a zip",
             });
+            println!("Revision is not a zip");
             return Err((StatusCode::NOT_FOUND, Json(error_response)));
         }
         let revision_name = revision.replace('.', "_");
@@ -277,6 +279,7 @@ pub async fn upload_revision(
                 "status": "fail",
                 "message": "The revision is empty",
             });
+            println!("Revision is empty");
             return Err((StatusCode::NOT_FOUND, Json(error_response)));
         }
         println!(
