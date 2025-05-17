@@ -24,6 +24,7 @@ use crate::{
         upload_revision,
     },
     user_handler::{
+        add_user_to_organization_handler,
         // get_last_code_handler,
         get_last_code_handler,
         get_me_handler,
@@ -35,7 +36,9 @@ use crate::{
         register_user_handler,
         request_new_password_handler,
         reset_password_handler,
-        update_me_handler,
+        update_organization_handler,
+        update_user_password_handler,
+        update_username_handler,
         verify_account_handler,
     },
     AppState,
@@ -65,8 +68,23 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
                 .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
         )
         .route(
-            "/api/v1/users/me",
-            post(update_me_handler)
+            "/api/v1/users/me/password",
+            post(update_user_password_handler)
+                .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
+        )
+        .route(
+            "/api/v1/users/me/username",
+            post(update_username_handler)
+                .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
+        )
+        .route(
+            "/api/v1/users/organization",
+            post(update_organization_handler)
+                .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
+        )
+        .route(
+            "/api/v1/users/add",
+            post(add_user_to_organization_handler)
                 .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
         )
         .route("/api/v1/project", get(get_projects))

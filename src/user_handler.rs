@@ -40,17 +40,25 @@ use rand_core::OsRng;
 use serde_json::json;
 use std::str::FromStr;
 
+use crate::utils::{
+    ORGANIZATION_NAME_PATTERN,
+    USERNAME_PATTERN,
+};
 use crate::{
     model::{
+        AddUserToOrganizationSchema,
         GetLastCodeSchema,
         GithubCallbackSchema,
         LoginUserSchema,
+        Organization,
         RegisterUserSchema,
         RequestPasswordSchema,
         ResetPasswordSchema,
         Role,
         TokenClaims,
-        UpdateUserSchema,
+        UpdateOrganizationSchema,
+        UpdateUserPasswordSchema,
+        UpdateUsernameSchema,
         User,
         Verification,
         VerificationType,
@@ -99,7 +107,7 @@ pub async fn register_user_handler(
             .fetch_one(&data.db)
             .await
             .map_err(|e| {
-                println!("Error checking if user exists: {:?}", e);
+                println!("Error checking if user exists: {e:?}");
                 let error_response = serde_json::json!({
                     "status": "fail",
                     "message": "Error checking if user exists",
@@ -117,12 +125,41 @@ pub async fn register_user_handler(
         }
     }
 
+    let escaped_username: String = body
+        .username
+        .to_owned()
+        .to_ascii_lowercase()
+        .trim()
+        .to_string();
+    validate_username(&escaped_username)?;
+
+    let escaped_organization_name: String = body.organization_name.to_owned().trim().to_string();
+
+    sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
+        escaped_username
+    )
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Error checking username: {e:?}");
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Error, this username is already taken",
+        });
+        (StatusCode::BAD_REQUEST, Json(error_response))
+    })?;
+
     let user = register_user_db(
         Some(body.password.clone().to_string()),
         &escaped_email,
+        &escaped_username,
+        &escaped_organization_name,
+        None,
         None,
         None,
         false,
+        &Role::Owner.to_string(),
         &data.db,
     )
     .await?;
@@ -156,7 +193,7 @@ pub async fn login_user_handler(
     .fetch_optional(&data.db)
     .await
     .map_err(|e| {
-        println!("Error fetching user: {:?}", e);
+        println!("Error fetching user: {e:?}");
         let error_response = serde_json::json!({
             "status": "error",
             "message": "Error user not found or not verified",
@@ -229,43 +266,6 @@ pub async fn get_me_handler(
     Ok(Json(json_response))
 }
 
-#[allow(dead_code)]
-pub async fn get_last_code_handler(
-    State(data): State<Arc<AppState>>,
-    Query(params): Query<GetLastCodeSchema>,
-) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let verification = sqlx::query_as!(
-        Verification,
-        "SELECT * FROM verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
-        params.user_id
-    )
-    .fetch_optional(&data.db)
-    .await
-    .map_err(|e| {
-        let error_response = serde_json::json!({
-            "status": "fail",
-            "message": format!("Database error: {}", e),
-        });
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
-    })?
-    .ok_or_else(|| {
-        let error_response = serde_json::json!({
-            "status": "fail",
-            "message": "No verification code found",
-        });
-        (StatusCode::NOT_FOUND, Json(error_response))
-    })?;
-
-    let json_response = serde_json::json!({
-        "status": "success",
-        "data": serde_json::json!({
-            "code": verification.id.to_string()
-        })
-    });
-
-    Ok(Json(json_response))
-}
-
 pub async fn verify_account_handler(
     State(data): State<Arc<AppState>>,
     Json(body): Json<VerifyEmailSchema>,
@@ -286,7 +286,7 @@ pub async fn verify_account_handler(
     .fetch_optional(&data.db)
     .await
     .map_err(|e| {
-        println!("Error fetching verification code: {:?}", e);
+        println!("Error fetching verification code: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error verifying the account",
@@ -317,7 +317,7 @@ pub async fn verify_account_handler(
     .fetch_one(&data.db)
     .await
     .map_err(|e| {
-        println!("Error updating user: {:?}", e);
+        println!("Error updating user: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error verifying the account",
@@ -332,7 +332,7 @@ pub async fn verify_account_handler(
     .fetch_one(&data.db)
     .await
     .map_err(|e| {
-        println!("Error updating verification on verify account: {:?}", e);
+        println!("Error updating verification on verify account: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error verifying the account",
@@ -348,10 +348,10 @@ pub async fn verify_account_handler(
     Ok(Json(json_response))
 }
 
-pub async fn update_me_handler(
+pub async fn update_user_password_handler(
     Extension(user): Extension<User>,
     State(data): State<Arc<AppState>>,
-    Json(body): Json<UpdateUserSchema>,
+    Json(body): Json<UpdateUserPasswordSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     if body.password != body.repeat_password {
         let error_response = serde_json::json!({
@@ -398,7 +398,7 @@ pub async fn update_me_handler(
     .fetch_one(&data.db)
     .await
     .map_err(|e| {
-        println!("Error updating user: {:?}", e);
+        println!("Error updating user: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error updating user",
@@ -419,6 +419,96 @@ pub async fn update_me_handler(
     Ok(Json(user_response))
 }
 
+pub async fn update_username_handler(
+    Extension(user): Extension<User>,
+    State(data): State<Arc<AppState>>,
+    Json(body): Json<UpdateUsernameSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let escaped_username: String = body
+        .username
+        .to_owned()
+        .to_ascii_lowercase()
+        .trim()
+        .to_string();
+    validate_username(&escaped_username)?;
+    sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
+        escaped_username
+    )
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Error checking username: {e:?}");
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Error, this username is already taken",
+        });
+        (StatusCode::BAD_REQUEST, Json(error_response))
+    })?;
+
+    sqlx::query_as!(
+        User,
+        "UPDATE users SET username = $1 WHERE id = $2 RETURNING *",
+        escaped_username,
+        user.id
+    )
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Error updating user: {e:?}");
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Error updating user",
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?;
+
+    let user_response = serde_json::json!({"status": "success","data": serde_json::json!({
+        "data": "{}"
+    })});
+    Ok(Json(user_response))
+}
+
+pub async fn update_organization_handler(
+    Extension(user): Extension<User>,
+    State(data): State<Arc<AppState>>,
+    Json(body): Json<UpdateOrganizationSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    body.validate()?;
+
+    let escaped_name: String = body.name.to_owned().trim().to_string();
+
+    if user.role != Role::Owner.to_string() {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "You are not the owner of the organization",
+        });
+        return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
+    }
+
+    let organization = sqlx::query_as!(
+        Organization,
+        "UPDATE organizations SET name = $1, description = $2 WHERE id = $3 RETURNING *",
+        escaped_name,
+        body.description,
+        user.organization_id
+    )
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Error updating organization: {e:?}");
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Error updating organization",
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?;
+    let organization_response = serde_json::json!({"status": "success","data": serde_json::json!({
+        "data": organization
+    })});
+    Ok(Json(organization_response))
+}
+
 pub async fn send_verification_email(
     user: &User,
     base_url: &str,
@@ -435,7 +525,7 @@ pub async fn send_verification_email(
     .fetch_one(db)
     .await
     .map_err(|e| {
-        println!("Error inserting verification: {:?}", e);
+        println!("Error inserting verification: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error creating verification code",
@@ -449,8 +539,7 @@ pub async fn send_verification_email(
     let mut dest: Destination = Destination::builder().build();
     dest.to_addresses = Some(vec![email]);
     let message = format!(
-        "Hello, \n Please verify your email by clicking on this link: <a href=\"{}\">{}</a>",
-        verification_link, verification_link
+        "Hello, \n Please verify your email by clicking on this link: <a href=\"{verification_link}\">{verification_link}</a>",
     );
     let subject_content = Content::builder()
         .data("Email verification".to_owned())
@@ -500,7 +589,7 @@ pub async fn request_new_password_handler(
         .fetch_optional(&data.db)
         .await
         .map_err(|e| {
-            println!("Error fetching user: {:?}", e);
+            println!("Error fetching user: {e:?}");
             let error_response = serde_json::json!({
                 "status": "fail",
                 "message": "Unknown error",
@@ -532,8 +621,7 @@ pub async fn github_login_handler(
     let redirect_uri = data.env.github_redirect_uri.clone();
 
     let github_auth_url = format!(
-        "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=user:email",
-        client_id, redirect_uri
+        "https://github.com/login/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&scope=user:email",
     );
 
     let json_response = serde_json::json!({
@@ -575,9 +663,9 @@ pub async fn github_callback_handler(
             }
         };
 
-    if user_existence.is_some() {
+    if let Some(user) = user_existence {
         let cookie = generate_token(
-            user_existence.unwrap().id.to_string(),
+            user.id.to_string(),
             &data.env.jwt_secret,
             &data.env.jwt_expires_in,
         );
@@ -589,13 +677,16 @@ pub async fn github_callback_handler(
 
         Ok(response)
     } else {
-        println!("must be registered");
         let user = register_user_db(
             None,
             &primary_email,
+            &username,
+            &format!("Default Organization for {username}"),
+            None,
             Some(github_id),
-            Some(username),
+            Some(username.clone()),
             true,
+            &Role::Owner.to_string(),
             &data.db,
         )
         .await?;
@@ -609,6 +700,98 @@ pub async fn github_callback_handler(
 
         Ok(response)
     }
+}
+
+pub async fn add_user_to_organization_handler(
+    Extension(user): Extension<User>,
+    State(data): State<Arc<AppState>>,
+    Json(body): Json<AddUserToOrganizationSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    if user.role != Role::Owner.to_string() && user.role != Role::Admin.to_string() {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "You are not allowed to perform this action",
+        });
+        return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
+    }
+
+    let organization = sqlx::query_as!(
+        Organization,
+        "SELECT * FROM organizations WHERE id = $1",
+        user.organization_id
+    )
+    .fetch_one(&data.db)
+    .await
+    .map_err(|e| {
+        println!("Error fetching organization: {e:?}");
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Error fetching organization",
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?;
+
+    let escaped_email: String = body
+        .email
+        .to_owned()
+        .to_ascii_lowercase()
+        .trim()
+        .to_string();
+    validate_login_params(&escaped_email, &body.password)?;
+
+    let escaped_username: String = body
+        .username
+        .to_owned()
+        .to_ascii_lowercase()
+        .trim()
+        .to_string();
+    validate_username(&escaped_username)?;
+
+    let user_exists: Option<bool> =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)")
+            .bind(escaped_email.to_owned())
+            .fetch_one(&data.db)
+            .await
+            .map_err(|e| {
+                println!("Error checking if user exists: {e:?}");
+                let error_response = serde_json::json!({
+                    "status": "fail",
+                    "message": "Error checking if user exists",
+                });
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+            })?;
+
+    if let Some(exists) = user_exists {
+        if exists {
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": "Unexpected error, please try again",
+            });
+            return Err((StatusCode::CONFLICT, Json(error_response)));
+        }
+    }
+
+    let new_user = register_user_db(
+        Some(body.password.clone().to_string()),
+        &escaped_email,
+        &escaped_username,
+        &organization.name,
+        Some(organization.id),
+        None,
+        None,
+        true,
+        &body.role.to_string(),
+        &data.db,
+    )
+    .await?;
+
+    let json_response = serde_json::json!({
+        "status": "success",
+        "data": serde_json::json!({
+            "user": filter_user_record(&new_user)
+        })
+    });
+    Ok(Json(json_response))
 }
 
 pub async fn send_request_new_password_email(
@@ -627,7 +810,7 @@ pub async fn send_request_new_password_email(
     .fetch_one(db)
     .await
     .map_err(|e| {
-        println!("Error inserting verification: {:?}", e);
+        println!("Error inserting verification: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error creating verification code",
@@ -644,8 +827,7 @@ pub async fn send_request_new_password_email(
     let mut dest: Destination = Destination::builder().build();
     dest.to_addresses = Some(vec![email]);
     let message = format!(
-        "Hello, \n You requested a new password, please use the following link to set a new password <a href=\"{}\">{}</a>",
-        verification_link, verification_link
+        "Hello, \n You requested a new password, please use the following link to set a new password <a href=\"{verification_link}\">{verification_link}</a>",
     );
     let subject_content = Content::builder()
         .data("Email verification".to_owned())
@@ -701,7 +883,7 @@ pub async fn reset_password_handler(
     .fetch_optional(&data.db)
     .await
     .map_err(|e| {
-        println!("Error fetching verification code: {:?}", e);
+        println!("Error fetching verification code: {e:?}");
         let error_response = serde_json::json!({
         "status": "fail",
         "message": "Error verifying the account",
@@ -746,7 +928,7 @@ pub async fn reset_password_handler(
     .fetch_one(&data.db)
     .await
     .map_err(|e| {
-        println!("Error updating user: {:?}", e);
+        println!("Error updating user: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error updating user",
@@ -762,7 +944,7 @@ pub async fn reset_password_handler(
     .fetch_one(&data.db)
     .await
     .map_err(|e| {
-        println!("Error updating verification on reset password: {:?}", e);
+        println!("Error updating verification on reset password: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error verifying the account",
@@ -843,7 +1025,7 @@ async fn exchange_code_for_token(
         .send()
         .await
         .map_err(|e| {
-            println!("Error getting GitHub token: {:?}", e);
+            println!("Error getting GitHub token: {e:?}");
             let error_response = serde_json::json!({
                 "status": "fail",
                 "message": "Failed to get GitHub token"
@@ -852,7 +1034,7 @@ async fn exchange_code_for_token(
         })?;
 
     let token_data: serde_json::Value = token_response.json().await.map_err(|e| {
-        println!("Error parsing token response: {:?}", e);
+        println!("Error parsing token response: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Failed to parse GitHub response"
@@ -878,12 +1060,12 @@ async fn get_github_data(
     // Get user data from GitHub
     let user_response = client
         .get("https://api.github.com/user")
-        .header("Authorization", format!("Bearer {}", access_token))
+        .header("Authorization", format!("Bearer {access_token}"))
         .header("User-Agent", "Soldeer")
         .send()
         .await
         .map_err(|e| {
-            println!("Error getting GitHub user data: {:?}", e);
+            println!("Error getting GitHub user data: {e:?}");
             let error_response = serde_json::json!({
                 "status": "fail",
                 "message": "Failed to get GitHub user data"
@@ -892,7 +1074,7 @@ async fn get_github_data(
         })?;
 
     let user_data: serde_json::Value = user_response.json().await.map_err(|e| {
-        println!("Error parsing user data: {:?}", e);
+        println!("Error parsing user data: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Failed to parse GitHub user data"
@@ -903,12 +1085,12 @@ async fn get_github_data(
     // Get user email from GitHub
     let email_response = client
         .get("https://api.github.com/user/emails")
-        .header("Authorization", format!("Bearer {}", access_token))
+        .header("Authorization", format!("Bearer {access_token}"))
         .header("User-Agent", "Soldeer-App")
         .send()
         .await
         .map_err(|e| {
-            println!("Error getting GitHub email: {:?}", e);
+            println!("Error getting GitHub email: {e:?}");
             let error_response = serde_json::json!({
                 "status": "fail",
                 "message": "Failed to get GitHub email"
@@ -917,7 +1099,7 @@ async fn get_github_data(
         })?;
 
     let email_data: Vec<serde_json::Value> = email_response.json().await.map_err(|e| {
-        println!("Error parsing email data: {:?}", e);
+        println!("Error parsing email data: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Failed to parse GitHub email data"
@@ -997,7 +1179,7 @@ async fn check_login_or_register(
     .fetch_optional(db)
     .await
     .map_err(|e| {
-        println!("Error fetching user on github login: {:?}", e);
+        println!("Error fetching user on github login: {e:?}");
         let error_response = serde_json::json!({
         "status": "fail",
         "message": "Error fetching the user",
@@ -1022,11 +1204,36 @@ async fn check_login_or_register(
 async fn register_user_db(
     password: Option<String>,
     email: &str,
+    username: &str,
+    organization_name: &str,
+    mut organization_id: Option<uuid::Uuid>,
     github_id: Option<String>,
     github_username: Option<String>,
     verified: bool,
+    role: &str,
     db: &sqlx::Pool<sqlx::Postgres>,
 ) -> Result<User, (StatusCode, Json<serde_json::Value>)> {
+    validate_organization_params(organization_name, "No Description")?;
+
+    if organization_id.is_none() {
+        let organization = sqlx::query_as!(
+            Organization,
+            "INSERT INTO organizations (name) VALUES ($1) RETURNING *",
+            organization_name
+        )
+        .fetch_one(db)
+        .await
+        .map_err(|e| {
+            println!("Error inserting organization: {e:?}");
+            let error_response = serde_json::json!({
+                "status": "fail",
+                "message": "Error creating organization",
+            });
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+        })?;
+        organization_id = Some(organization.id);
+    }
+
     let salt = SaltString::generate(&mut OsRng);
     let normalized_password = match password {
         Some(password) => password,
@@ -1045,18 +1252,20 @@ async fn register_user_db(
 
     let user = sqlx::query_as!(
         User,
-        "INSERT INTO users (email,password,role,github_id,github_username,verified) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+        "INSERT INTO users (email,password,username,role,github_id,github_username,verified, organization_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
         email,
         hashed_password,
-        Role::User.to_string(),
+        username,
+        role,
         github_id,
         github_username,
-        verified
+        verified,
+        organization_id.unwrap()
     )
     .fetch_one(db)
     .await
     .map_err(|e| {
-        println!("Error inserting user: {:?}", e);
+        println!("Error inserting user: {e:?}");
         let error_response = serde_json::json!({
             "status": "fail",
             "message": "Error creating user",
@@ -1065,4 +1274,92 @@ async fn register_user_db(
     })?;
 
     Ok(user)
+}
+
+pub fn validate_organization_params(
+    name: &str,
+    description: &str,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    if name.len() < 3 {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Organization name must be at least 3 characters",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    if description.len() < 3 {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Organization description must be at least 3 characters",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    let pattern_name = regex::Regex::new(ORGANIZATION_NAME_PATTERN).unwrap();
+    if !pattern_name.is_match(&name.to_ascii_lowercase()) {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Invalid organization name format",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+
+    Ok(())
+}
+
+pub fn validate_username(username: &str) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    if username.len() < 3 {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Username must be at least 3 characters",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+    let pattern_name = regex::Regex::new(USERNAME_PATTERN).unwrap();
+    if !pattern_name.is_match(&username.to_ascii_lowercase()) {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "Invalid username format",
+        });
+        return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub async fn get_last_code_handler(
+    State(data): State<Arc<AppState>>,
+    Query(params): Query<GetLastCodeSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let verification = sqlx::query_as!(
+        Verification,
+        "SELECT * FROM verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+        params.user_id
+    )
+    .fetch_optional(&data.db)
+    .await
+    .map_err(|e| {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": format!("Database error: {e:?}"),
+        });
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
+    })?
+    .ok_or_else(|| {
+        let error_response = serde_json::json!({
+            "status": "fail",
+            "message": "No verification code found",
+        });
+        (StatusCode::NOT_FOUND, Json(error_response))
+    })?;
+
+    let json_response = serde_json::json!({
+        "status": "success",
+        "data": serde_json::json!({
+            "code": verification.id.to_string()
+        })
+    });
+
+    Ok(Json(json_response))
 }

@@ -5,6 +5,7 @@ mod project_handler;
 mod response;
 mod route;
 mod user_handler;
+mod utils;
 
 use aws_config::BehaviorVersion;
 use aws_sdk_s3 as s3;
@@ -52,7 +53,7 @@ async fn main() {
             pool
         }
         Err(err) => {
-            println!("🔥 Failed to connect to the database: {:?}", err);
+            println!("🔥 Failed to connect to the database: {err:?}");
             std::process::exit(1);
         }
     };

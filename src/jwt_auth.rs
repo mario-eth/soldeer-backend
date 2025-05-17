@@ -91,7 +91,7 @@ pub async fn auth(
         .map_err(|e| {
             let json_error = ErrorResponse {
                 status: "fail",
-                message: format!("Error fetching user from database: {}", e),
+                message: format!("Error fetching user from database: {e:?}"),
             };
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json_error))
         })?;
