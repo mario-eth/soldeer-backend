@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO users (email,password,role,github_id,github_username,verified) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+  "query": "INSERT INTO users (email,password,username,role,github_id,github_username,verified, organization_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
   "describe": {
     "columns": [
       {
@@ -47,6 +47,16 @@
         "ordinal": 8,
         "name": "github_username",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "username",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "organization_id",
+        "type_info": "Uuid"
       }
     ],
     "parameters": {
@@ -54,9 +64,11 @@
         "Varchar",
         "Varchar",
         "Varchar",
+        "Varchar",
         "Text",
         "Text",
-        "Bool"
+        "Bool",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -68,8 +80,10 @@
       true,
       true,
       true,
+      true,
+      false,
       true
     ]
   },
-  "hash": "82250a98edb51f8aa5c55b94883169be014bad0c83fff61d268f39c406866721"
+  "hash": "597b7bc15b5bdc641c8c160910853f7db60caae1c5b57b912d43c6b0035d676f"
 }

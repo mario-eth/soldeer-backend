@@ -47,6 +47,16 @@
         "ordinal": 8,
         "name": "github_username",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "username",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "organization_id",
+        "type_info": "Uuid"
       }
     ],
     "parameters": {
@@ -64,6 +74,8 @@
       true,
       true,
       true,
+      true,
+      false,
       true
     ]
   },

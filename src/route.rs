@@ -16,7 +16,7 @@ use crate::{
     jwt_auth::auth,
     project_handler::{
         add_project_handler,
-        delete_project_handler,
+        deprecate_project_handler,
         get_project_revisions,
         get_project_revisions_cli,
         get_projects,
@@ -101,8 +101,8 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
                 .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
         )
         .route(
-            "/api/v1/project",
-            delete(delete_project_handler)
+            "/api/v1/project/deprecate",
+            post(deprecate_project_handler)
                 .route_layer(middleware::from_fn_with_state(app_state.clone(), auth)),
         )
         .route(

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE users SET github_id = $1, github_username = $2, verified = true WHERE id = $3 RETURNING *",
+  "query": "UPDATE projects SET deleted = TRUE WHERE id = $1 AND organization_id = $2 AND deleted = FALSE RETURNING *",
   "describe": {
     "columns": [
       {
@@ -10,59 +10,63 @@
       },
       {
         "ordinal": 1,
-        "name": "email",
+        "name": "name",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "verified",
-        "type_info": "Bool"
+        "name": "description",
+        "type_info": "Text"
       },
       {
         "ordinal": 3,
-        "name": "password",
-        "type_info": "Varchar"
+        "name": "github_url",
+        "type_info": "Text"
       },
       {
         "ordinal": 4,
-        "name": "role",
-        "type_info": "Varchar"
+        "name": "deleted",
+        "type_info": "Bool"
       },
       {
         "ordinal": 5,
+        "name": "created_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
-        "name": "github_id",
-        "type_info": "Text"
-      },
-      {
         "ordinal": 8,
-        "name": "github_username",
-        "type_info": "Text"
+        "name": "downloads",
+        "type_info": "Int8"
       },
       {
         "ordinal": 9,
-        "name": "username",
-        "type_info": "Varchar"
+        "name": "image",
+        "type_info": "Text"
       },
       {
         "ordinal": 10,
+        "name": "long_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
         "name": "organization_id",
         "type_info": "Uuid"
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
+        "Uuid",
         "Uuid"
       ]
     },
@@ -72,13 +76,14 @@
       false,
       false,
       false,
-      true,
-      true,
-      true,
-      true,
       false,
+      true,
+      true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "14b5f7a84b11c7094c4cc1fc251bcd5574ae3e7c6df98608b7afb4cc0acd39b1"
+  "hash": "c170158407b52f5b7a9864f84efab2972eb58002a89c5a683aab4e040223c792"
 }

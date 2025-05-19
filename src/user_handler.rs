@@ -125,12 +125,7 @@ pub async fn register_user_handler(
         }
     }
 
-    let escaped_username: String = body
-        .username
-        .to_owned()
-        .to_ascii_lowercase()
-        .trim()
-        .to_string();
+    let escaped_username: String = body.username.to_owned().trim().to_string();
     validate_username(&escaped_username)?;
 
     let escaped_organization_name: String = body.organization_name.to_owned().trim().to_string();
@@ -424,12 +419,7 @@ pub async fn update_username_handler(
     State(data): State<Arc<AppState>>,
     Json(body): Json<UpdateUsernameSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let escaped_username: String = body
-        .username
-        .to_owned()
-        .to_ascii_lowercase()
-        .trim()
-        .to_string();
+    let escaped_username: String = body.username.to_owned().trim().to_string();
     validate_username(&escaped_username)?;
     sqlx::query_scalar!(
         "SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
@@ -739,12 +729,7 @@ pub async fn add_user_to_organization_handler(
         .to_string();
     validate_login_params(&escaped_email, &body.password)?;
 
-    let escaped_username: String = body
-        .username
-        .to_owned()
-        .to_ascii_lowercase()
-        .trim()
-        .to_string();
+    let escaped_username: String = body.username.to_owned().trim().to_string();
     validate_username(&escaped_username)?;
 
     let user_exists: Option<bool> =

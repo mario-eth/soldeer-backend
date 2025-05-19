@@ -30,7 +30,7 @@
       },
       {
         "ordinal": 5,
-        "name": "user_id",
+        "name": "created_by",
         "type_info": "Uuid"
       },
       {
@@ -57,6 +57,11 @@
         "ordinal": 10,
         "name": "long_description",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "organization_id",
+        "type_info": "Uuid"
       }
     ],
     "parameters": {
@@ -71,6 +76,7 @@
       false,
       false,
       false,
+      true,
       true,
       true,
       true,

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE projects SET description = $1, github_url = $2, image = $3, long_description = $4 WHERE id = $5 AND user_id = $6 RETURNING *",
+  "query": "SELECT * FROM projects WHERE id = $1 AND organization_id = $2 AND deleted = FALSE",
   "describe": {
     "columns": [
       {
@@ -30,7 +30,7 @@
       },
       {
         "ordinal": 5,
-        "name": "user_id",
+        "name": "created_by",
         "type_info": "Uuid"
       },
       {
@@ -57,14 +57,15 @@
         "ordinal": 10,
         "name": "long_description",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "organization_id",
+        "type_info": "Uuid"
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
-        "Text",
-        "Text",
         "Uuid",
         "Uuid"
       ]
@@ -80,8 +81,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "489145f26fa97d9901189b72a178dd956b74fb9f3afd79367e98ccf76d6480ab"
+  "hash": "2fd92d70b9dc0a8bebec9f88a317cf90c8f36bce33dba2c33dddb2e2a5b14e05"
 }

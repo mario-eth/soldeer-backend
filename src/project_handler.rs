@@ -154,7 +154,7 @@ pub async fn update_project_handler(
     Ok(Json(project_response))
 }
 
-pub async fn delete_project_handler(
+pub async fn deprecate_project_handler(
     Extension(user): Extension<User>,
     State(data): State<Arc<AppState>>,
     Json(body): Json<UpdateProjectSchema>,
@@ -350,14 +350,14 @@ pub async fn get_projects(
     let offset = params.offset.unwrap_or(0);
     if params.project_id.is_some() {
         query = sqlx::query_as(
-            "SELECT * FROM projects WHERE id = $1 AND deleted = FALSE ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
+            "SELECT * FROM projects WHERE id = $1 ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
         )
         .bind(params.project_id.unwrap())
         .bind(limit)
         .bind(offset);
     } else if params.project_name.is_some() {
         query = sqlx::query_as(
-            "SELECT * FROM projects WHERE name = $1 AND deleted = FALSE ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
+            "SELECT * FROM projects WHERE name = $1 ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
         )
         .bind(params.project_name.unwrap())
         .bind(limit)
@@ -378,7 +378,7 @@ pub async fn get_projects(
             return Err((StatusCode::BAD_REQUEST, Json(error_response)));
         }
         query = sqlx::query_as(
-            "SELECT * FROM projects WHERE organization_id = $1 AND deleted = FALSE ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
+            "SELECT * FROM projects WHERE organization_id = $1 ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
         )
         .bind(params.organization_id.unwrap())
         .bind(limit)
